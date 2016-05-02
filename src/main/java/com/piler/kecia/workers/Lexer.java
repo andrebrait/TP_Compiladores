@@ -16,6 +16,8 @@ public class Lexer {
 
     private boolean eof;
 
+    private boolean refeed;
+
     @Getter
     private int line;
 
@@ -25,8 +27,9 @@ public class Lexer {
     public Lexer(String filepath) {
         SymbolTable.initialize();
         this.charHandl = new CharacterHandler(filepath);
-        this.line = 0;
+        this.line = 1;
         this.eof = false;
+        this.refeed = false;
     }
 
     private void readch() throws EOFException {
@@ -45,7 +48,24 @@ public class Lexer {
     }
 
     private boolean isLineBreak(String ch) {
-        return StringUtils.containsAny(ch, StringUtils.CR, StringUtils.LF);
+        boolean result = StringUtils.equals(ch, StringUtils.CR) || StringUtils.equals(ch(), StringUtils.LF);
+        if (result) {
+            line++;
+        }
+        return result;
+    }
+
+    private void readchSetEOF() {
+        try {
+            readch();
+        } catch (EOFException e) {
+            eof = true;
+        }
+    }
+
+    private void removeLastFromSeqAndRefeed() {
+        charSeq.deleteCharAt(charSeq.length() - 1);
+        refeed = true;
     }
 
     public Token scan() {
@@ -56,19 +76,31 @@ public class Lexer {
 
         this.charSeq = new StringBuilder();
 
+        if (refeed) {
+            this.charSeq.append(ch());
+            refeed = false;
+        } else {
+            readchSetEOF();
+        }
+
+        if (eof) {
+            return new EOFToken();
+        }
+
         //Não será lido o próximo char se o último retornado tiver sido um separador, limitador ou operador.
         //Este é o início de um novo token, nestes casos.
-        if (ch() == null || StringUtils.isWhitespace(ch()) || isLineBreak(ch())) {
+        if (ch() == null || isLineBreak(ch()) || StringUtils.isBlank(ch())) {
             try {
-                for (; ; readch()) {
+                do {
+                    readch();
                     if (isLineBreak(ch())) {
-                        line++;
                         continue;
-                    } else if (StringUtils.isWhitespace(ch())) {
+                    } else if (ch() == null || StringUtils.isBlank(ch())) {
                         continue;
                     }
                     break;
                 }
+                while (true);
             } catch (EOFException e) {
                 return new EOFToken();
             }
@@ -84,6 +116,7 @@ public class Lexer {
                 } catch (EOFException e) {
                     eof = true;
                 }
+                removeLastFromSeqAndRefeed();
                 return null;
             case "=":
                 return Operator.EQ;
@@ -95,6 +128,7 @@ public class Lexer {
                 } catch (EOFException e) {
                     eof = true;
                 }
+                removeLastFromSeqAndRefeed();
                 return Operator.GT;
             case "<":
                 try {
@@ -107,6 +141,7 @@ public class Lexer {
                 if (StringUtils.equals(ch(), ">")) {
                     return Operator.NEQ;
                 }
+                removeLastFromSeqAndRefeed();
                 return Operator.LT;
             case "+":
                 return Operator.SUM;
@@ -122,7 +157,6 @@ public class Lexer {
                             do {
                                 readch();
                             } while (!isLineBreak(ch()));
-                            line++;
                             return scan();
                         } catch (EOFException e) {
                             return new EOFToken();
@@ -131,6 +165,7 @@ public class Lexer {
                 } catch (EOFException e) {
                     eof = true;
                 }
+                removeLastFromSeqAndRefeed();
                 return Operator.DIV;
 
             // Limitadores
@@ -148,7 +183,6 @@ public class Lexer {
                         }
                     } while (!StringUtils.equals(ch(), "}"));
                     lit = new Literal(StringUtils.replaceEach(charSeq.toString(), new String[]{"{", "}"}, new String[]{"", ""}));
-                    readch();
                 } catch (EOFException e) {
                     eof = true;
                 }
@@ -161,9 +195,7 @@ public class Lexer {
                 try {
                     do {
                         readch();
-                        if (isLineBreak(ch())) {
-                            line++;
-                        }
+                        isLineBreak(ch());
                     } while (!StringUtils.equals(ch(), "%"));
                 } catch (EOFException e) {
                     return new EOFToken();
@@ -183,6 +215,7 @@ public class Lexer {
                 } while (StringUtils.isNumeric(ch()));
                 // 123c não é uma sequência válida
                 if (beginZero && lengthGtOne) {
+                    removeLastFromSeqAndRefeed();
                     return null;
                 }
                 if (StringUtils.isAlpha(ch())) {
@@ -194,11 +227,13 @@ public class Lexer {
                     } catch (EOFException e) {
                         eof = true;
                     }
+                    removeLastFromSeqAndRefeed();
                     return null;
                 }
             } catch (EOFException e) {
                 eof = true;
             }
+            removeLastFromSeqAndRefeed();
             return new Num(value);
         }
 
@@ -210,6 +245,7 @@ public class Lexer {
             } catch (EOFException e) {
                 eof = true;
             }
+            removeLastFromSeqAndRefeed();
             String value = charSeq.toString().trim();
             if (value.length() > 15 || StringUtils.countMatches(value, "_") == value.length()) {
                 return null;
@@ -224,4 +260,5 @@ public class Lexer {
 
         return null;
     }
+
 }

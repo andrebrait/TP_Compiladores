@@ -17,11 +17,10 @@ public class CharacterHandler {
     private String ch;
 
     public CharacterHandler(String filename) {
-        Charset encoding = Charset.defaultCharset();
         File file = new File(filename);
         try {
             InputStream in = new FileInputStream(file);
-            Reader reader = new InputStreamReader(in, encoding);
+            Reader reader = new InputStreamReader(in, Charset.forName("UTF-8"));
             this.buffer = new BufferedReader(reader);
         } catch (IOException e) {
             e.printStackTrace();
@@ -37,6 +36,8 @@ public class CharacterHandler {
                 return;
             }
             throw new EOFException();
+        } catch (EOFException e) {
+            throw e;
         } catch (IOException e) {
             e.printStackTrace();
             throw new RuntimeException("Erro na leitura do arquivo");
