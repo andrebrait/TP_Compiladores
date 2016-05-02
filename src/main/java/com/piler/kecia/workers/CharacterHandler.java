@@ -29,20 +29,21 @@ public class CharacterHandler {
         }
     }
 
-    public void readch() {
+    public void readch() throws EOFException {
         int r;
         try {
             if ((r = buffer.read()) != -1) {
                 ch = String.valueOf((char) r);
+                return;
             }
+            throw new EOFException();
         } catch (IOException e) {
             e.printStackTrace();
             throw new RuntimeException("Erro na leitura do arquivo");
         }
-        ch = null;
     }
 
-    public boolean readch(String ch) {
+    public boolean readch(String ch) throws EOFException {
         readch();
         return StringUtils.equals(this.ch, ch);
     }

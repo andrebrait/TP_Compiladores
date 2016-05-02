@@ -23,6 +23,7 @@ public class Operator extends Token<String> {
     public static final Operator SUBT = new Operator("-", Tag.SUBT);
     public static final Operator MULT = new Operator("*", Tag.MULT);
     public static final Operator DIV = new Operator("/", Tag.DIV);
+    public static final Operator ASSIGN = new Operator(":=", Tag.ASSIGN);
 
     private Operator(String lexeme, Tag tag){
         super(lexeme, tag);

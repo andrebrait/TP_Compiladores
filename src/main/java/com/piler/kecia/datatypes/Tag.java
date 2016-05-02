@@ -43,8 +43,6 @@ public enum Tag {
     //Separadores
     OP_PAR,
     CL_PAR,
-    OP_BRACKET,
-    CL_BRACKET,
     SEMICOLON,
     COMMA,
 
