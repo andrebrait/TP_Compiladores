@@ -18,6 +18,7 @@ public class Limiter extends Token<String>{
     public static final Limiter OP_BRACKET = new Limiter("{", Tag.OP_BRACKET);
     public static final Limiter CL_BRACKET = new Limiter("}", Tag.CL_BRACKET);
     public static final Limiter SEMICOLON = new Limiter(";", Tag.SEMICOLON);
+    public static final Limiter COMMA = new Limiter(",", Tag.COMMA);
 
     private Limiter(String lexeme, Tag tag){
         super(lexeme, tag);

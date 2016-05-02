@@ -46,6 +46,7 @@ public enum Tag {
     OP_BRACKET,
     CL_BRACKET,
     SEMICOLON,
+    COMMA,
 
     //Outros
     ID,
