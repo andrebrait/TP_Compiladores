@@ -23,7 +23,7 @@ public class Main {
         while (!(result instanceof EOFToken)) {
             result = lex.scan();
             if (result == null) {
-                System.out.println("ERRO: Token inválido na linha " + String.valueOf(lex.getLine()) + ". Sequência de caracteres: [ " + lex.getCharSeq().toString() + " ].");
+                System.out.println("ERRO: Token inválido na linha " + String.valueOf(lex.getLine()) + ". Sequência de caracteres: [" + lex.getCharSeq().toString() + "].");
                 continue;
             }
             if (!(result instanceof EOFToken)) {

@@ -3,7 +3,6 @@ package com.piler.kecia.workers;
 import com.piler.kecia.datatypes.SymbolTable;
 import com.piler.kecia.datatypes.token.*;
 import lombok.Getter;
-import org.apache.commons.lang3.StringUtils;
 
 import java.io.EOFException;
 
@@ -32,6 +31,64 @@ public class Lexer {
         this.refeed = false;
     }
 
+    private static boolean isAlpha(String ch) {
+        return ch.matches("[a-zA-Z]");
+    }
+
+    private static boolean isNumeric(String ch) {
+        return ch.matches("[0-9]");
+    }
+
+    private static boolean isAlphanumeric(String ch) {
+        return isNumeric(ch) || isAlpha(ch);
+    }
+
+    private static boolean equals(String ch1, String ch2) {
+        return ch1 == null && ch2 == null || ch1 != null && ch2 != null && ch1.equals(ch2);
+    }
+
+    private static boolean isBlank(String ch) {
+        if (ch == null) {
+            return true;
+        }
+        for (char c : ch.toCharArray()) {
+            if (!Character.isWhitespace(c)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static String removeLast(String str) {
+        if (str == null) {
+            return null;
+        }
+        return str.substring(str.length() - 1);
+    }
+
+    private static String removeFirstAndLast(String str) {
+        if (str == null) {
+            return null;
+        }
+        return str.substring(1, str.length() - 1);
+    }
+
+    private static int countMatches(String str, char ch) {
+        int result = 0;
+        if (str != null) {
+            for (char c : str.toCharArray()) {
+                if (c == ch) {
+                    result++;
+                }
+            }
+        }
+        return result;
+    }
+
+    private static boolean beginsWith(String str, char ch) {
+        return str != null && str.toCharArray()[0] == ch;
+    }
+
     private void readch() throws EOFException {
         charHandl.readch();
         charSeq.append(ch());
@@ -48,19 +105,11 @@ public class Lexer {
     }
 
     private boolean isLineBreak(String ch) {
-        boolean result = StringUtils.equals(ch, StringUtils.CR) || StringUtils.equals(ch(), StringUtils.LF);
+        boolean result = equals(ch, "\n") || equals(ch(), "\r");
         if (result) {
             line++;
         }
         return result;
-    }
-
-    private void readchSetEOF() {
-        try {
-            readch();
-        } catch (EOFException e) {
-            eof = true;
-        }
     }
 
     private void removeLastFromSeqAndRefeed() {
@@ -80,7 +129,11 @@ public class Lexer {
             this.charSeq.append(ch());
             refeed = false;
         } else {
-            readchSetEOF();
+            try {
+                readch();
+            } catch (EOFException e) {
+                eof = true;
+            }
         }
 
         if (eof) {
@@ -89,15 +142,18 @@ public class Lexer {
 
         //Não será lido o próximo char se o último retornado tiver sido um separador, limitador ou operador.
         //Este é o início de um novo token, nestes casos.
-        if (ch() == null || isLineBreak(ch()) || StringUtils.isBlank(ch())) {
+        if (isLineBreak(ch()) || isBlank(ch())) {
             try {
                 do {
                     readch();
                     if (isLineBreak(ch())) {
                         continue;
-                    } else if (ch() == null || StringUtils.isBlank(ch())) {
+                    } else if (isBlank(ch())) {
                         continue;
                     }
+                    String str = charSeq.toString();
+                    charSeq = new StringBuilder();
+                    charSeq.append(str.substring(str.length() - 1));
                     break;
                 }
                 while (true);
@@ -138,7 +194,7 @@ public class Lexer {
                 } catch (EOFException e) {
                     eof = true;
                 }
-                if (StringUtils.equals(ch(), ">")) {
+                if (equals(ch(), ">")) {
                     return Operator.NEQ;
                 }
                 removeLastFromSeqAndRefeed();
@@ -178,11 +234,12 @@ public class Lexer {
                 try {
                     do {
                         readch();
-                        if (StringUtils.equals(ch(), "{") || isLineBreak(ch())) {
+                        if (equals(ch(), "{") || isLineBreak(ch())) {
                             return null;
                         }
-                    } while (!StringUtils.equals(ch(), "}"));
-                    lit = new Literal(StringUtils.replaceEach(charSeq.toString(), new String[]{"{", "}"}, new String[]{"", ""}));
+                    } while (!equals(ch(), "}"));
+                    String value = charSeq.toString();
+                    lit = new Literal(value.substring(1, value.length() - 1));
                 } catch (EOFException e) {
                     eof = true;
                 }
@@ -196,34 +253,38 @@ public class Lexer {
                     do {
                         readch();
                         isLineBreak(ch());
-                    } while (!StringUtils.equals(ch(), "%"));
+                    } while (!equals(ch(), "%"));
                 } catch (EOFException e) {
                     return new EOFToken();
                 }
                 return scan();
         }
 
-        if (StringUtils.isNumeric(ch())) {
+        if (isNumeric(ch())) {
             int value = 0;
-            boolean lengthGtOne = false;
+            int len = 0;
             boolean beginZero = false;
             try {
                 do {
-                    beginZero = (value = 10 * value + Integer.valueOf(ch())) == 0;
-                    lengthGtOne = true;
+                    int charValue = Integer.valueOf(ch());
+                    if (len == 0 && charValue == 0) {
+                        beginZero = true;
+                    }
+                    value = 10 * value + charValue;
+                    len++;
                     readch();
-                } while (StringUtils.isNumeric(ch()));
-                // 123c não é uma sequência válida
-                if (beginZero && lengthGtOne) {
+                } while (isNumeric(ch()));
+                if (beginZero && len > 1) {
                     removeLastFromSeqAndRefeed();
                     return null;
                 }
-                if (StringUtils.isAlpha(ch())) {
+                // 123c não é uma sequência válida
+                if (isAlpha(ch())) {
                     try {
                         do {
                             //Lendo até o próximo separador, limitador ou operador.
                             readch();
-                        } while (StringUtils.isAlphanumeric(ch()));
+                        } while (isAlphanumeric(ch()));
                     } catch (EOFException e) {
                         eof = true;
                     }
@@ -237,17 +298,18 @@ public class Lexer {
             return new Num(value);
         }
 
-        if (StringUtils.isAlpha(ch()) || StringUtils.equals(ch(), "_")) {
+        if (isAlpha(ch()) || equals(ch(), "_")) {
             try {
                 do {
                     readch();
-                } while (StringUtils.isAlphanumeric(ch()) || StringUtils.equals(ch(), "_"));
+                } while (isAlphanumeric(ch()) || equals(ch(), "_"));
             } catch (EOFException e) {
                 eof = true;
             }
             removeLastFromSeqAndRefeed();
             String value = charSeq.toString().trim();
-            if (value.length() > 15 || StringUtils.countMatches(value, "_") == value.length()) {
+            int numUnderscore = countMatches(value, '_');
+            if (numUnderscore > 1 || equals(value, "_") || numUnderscore == 1 && !beginsWith(value, '_') || value.length() > 15) {
                 return null;
             }
             if (SymbolTable.hasToken(value)) {

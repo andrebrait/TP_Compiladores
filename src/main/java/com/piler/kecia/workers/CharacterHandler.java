@@ -1,7 +1,6 @@
 package com.piler.kecia.workers;
 
 import lombok.Getter;
-import org.apache.commons.lang3.StringUtils;
 
 import java.io.*;
 import java.nio.charset.Charset;
@@ -46,6 +45,6 @@ public class CharacterHandler {
 
     public boolean readch(String ch) throws EOFException {
         readch();
-        return StringUtils.equals(this.ch, ch);
+        return this.ch == null && ch == null || this.ch != null && ch != null && this.ch.equals(ch);
     }
 }
