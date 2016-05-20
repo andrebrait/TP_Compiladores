@@ -1,5 +1,6 @@
 package com.piler.kecia;
 
+import com.piler.kecia.datatypes.SymbolTable;
 import com.piler.kecia.datatypes.token.EOFToken;
 import com.piler.kecia.datatypes.token.Token;
 import com.piler.kecia.workers.Lexer;
@@ -31,6 +32,8 @@ public class Main {
             }
         }
 
-        System.out.println("Fim do arquivo atingido: " + result.toString());
+        System.out.println("Fim do arquivo atingido: " + result.toString() + System.lineSeparator());
+
+        System.out.println(SymbolTable.strValue());
     }
 }

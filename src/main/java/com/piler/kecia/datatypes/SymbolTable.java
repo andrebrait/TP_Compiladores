@@ -2,20 +2,18 @@ package com.piler.kecia.datatypes;
 
 import com.piler.kecia.datatypes.token.Token;
 import com.piler.kecia.datatypes.token.Word;
-import lombok.ToString;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
  * Created by andre on 24/04/16.
  */
-@ToString
 public class SymbolTable {
 
-    private final static Map<Token.TokenValue<String>, Word> tokenMap = new HashMap();
+    private final static Map<Token.TokenValue<String>, Word> tokenMap = new LinkedHashMap<>();
 
     public static boolean hasToken(Token.TokenValue<String> tokenValue) {
         return tokenMap.containsKey(tokenValue);
@@ -48,6 +46,16 @@ public class SymbolTable {
                 }
             }
         }
+    }
+
+    public static String strValue() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("SymbolTable(" + System.lineSeparator());
+        for (Map.Entry<Token.TokenValue<String>, Word> entry : tokenMap.entrySet()) {
+            sb.append("\tValue=" + entry.getKey().getValue() + ", Token(Tag=" + entry.getValue().getTag() + ")" + System.lineSeparator());
+        }
+        sb.append(")");
+        return sb.toString();
     }
 
 }
