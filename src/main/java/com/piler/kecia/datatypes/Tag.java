@@ -53,7 +53,7 @@ public enum Tag {
 
     private static final int OFFSET = 256;
 
-    public int getValue(){
+    public int getValue() {
         return OFFSET + this.ordinal();
     }
 }

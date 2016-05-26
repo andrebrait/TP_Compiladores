@@ -11,7 +11,7 @@ import lombok.ToString;
 @Data
 @EqualsAndHashCode(callSuper = true)
 @ToString(callSuper = true)
-public class Word extends Token<String>{
+public class Word extends Token<String> {
 
     public static final Word VAR = new Word("var", Tag.VAR);
     public static final Word BEGIN = new Word("begin", Tag.BEGIN);
@@ -30,8 +30,8 @@ public class Word extends Token<String>{
     public static final Word OR = new Word("or", Tag.OR);
     public static final Word AND = new Word("and", Tag.AND);
 
-    public Word(String lexeme, Tag tag){
+    public Word(String lexeme, Tag tag) {
         super(lexeme, tag);
     }
-    
+
 }
