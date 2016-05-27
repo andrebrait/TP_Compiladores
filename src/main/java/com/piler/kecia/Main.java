@@ -9,31 +9,49 @@ public class Main {
 
     public static void main(String[] args) {
 
-        if (args.length != 1) {
-            System.out.println("Argumentos errados!");
-            System.out.println("Uso correto: java -jar <nome_do_jar> <nome_do_arquivo>");
+        if (args.length != 2) {
+            exibeErro();
             return;
         }
 
-        System.out.println("Iniciando analisador léxico");
-
-        Lexer lex = new Lexer(args[0]);
+        Lexer lex = new Lexer(args[1]);
 
         Token result = null;
 
-        while (!(result instanceof EOFToken)) {
-            result = lex.scan();
-            if (result == null) {
-                System.out.println("ERRO: Token inválido na linha " + String.valueOf(lex.getLine()) + ". Sequência de caracteres: [" + lex.getCharSeq().toString() + "].");
-                continue;
-            }
-            if (!(result instanceof EOFToken)) {
-                System.out.println("Token válido encontrado na linha " + String.valueOf(lex.getLine()) + ": " + result.toString());
-            }
+        switch (args[0]) {
+            case "lexico":
+                System.out.println("Iniciando analisador léxico");
+                while (!(result instanceof EOFToken)) {
+                    result = lex.scan();
+                    if (result == null) {
+                        System.out.println("ERRO: Token inválido na linha " + String.valueOf(lex.getLine()) + ". Sequência de caracteres: [" + lex.getCharSeq().toString() + "].");
+                        continue;
+                    }
+                    if (!(result instanceof EOFToken)) {
+                        System.out.println("Token válido encontrado na linha " + String.valueOf(lex.getLine()) + ": " + result.toString());
+                    }
+                }
+
+                System.out.println("Fim do arquivo atingido: " + result.toString() + System.lineSeparator());
+
+                System.out.println(SymbolTable.strValue());
+                return;
+            case "sintatico":
+                exibeNaoImplementado(args);
+            default:
+                exibeErro();
         }
+    }
 
-        System.out.println("Fim do arquivo atingido: " + result.toString() + System.lineSeparator());
+    private static void exibeErro() {
+        System.out.println("Argumentos errados!");
+        System.out.println("Uso correto: java -jar <nome_do_jar> <fase> <nome_do_arquivo>");
+        return;
+    }
 
-        System.out.println(SymbolTable.strValue());
+    private static void exibeNaoImplementado(String[] args) {
+        System.out.println("Fase de compilação ainda não implementada!");
+        System.out.println("Fase selecionada: " + args[1]);
+        return;
     }
 }
