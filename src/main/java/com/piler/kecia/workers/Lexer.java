@@ -59,20 +59,6 @@ public class Lexer {
         return true;
     }
 
-    private static String removeLast(String str) {
-        if (str == null) {
-            return null;
-        }
-        return str.substring(str.length() - 1);
-    }
-
-    private static String removeFirstAndLast(String str) {
-        if (str == null) {
-            return null;
-        }
-        return str.substring(1, str.length() - 1);
-    }
-
     private static int countMatches(String str, char ch) {
         int result = 0;
         if (str != null) {
