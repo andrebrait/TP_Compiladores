@@ -1,5 +1,6 @@
 package com.piler.kecia.datatypes;
 
+import com.piler.kecia.Main;
 import com.piler.kecia.datatypes.token.Token;
 import com.piler.kecia.datatypes.token.Word;
 
@@ -48,14 +49,27 @@ public class SymbolTable {
         }
     }
 
-    public static String strValue() {
+    private static String strValue() {
         StringBuilder sb = new StringBuilder();
-        sb.append("SymbolTable(" + System.lineSeparator());
+        sb.append("SymbolTable(");
+        sb.append(System.lineSeparator());
         for (Map.Entry<Token.TokenValue<String>, Word> entry : tokenMap.entrySet()) {
-            sb.append("\tValue=" + entry.getKey().getValue() + ", Token(Tag=" + entry.getValue().getTag() + ")" + System.lineSeparator());
+            sb.append("\tValue=");
+            sb.append(entry.getKey().getValue());
+            sb.append(", Token(Tag=");
+            sb.append(entry.getValue().getTag());
+            sb.append(")");
+            sb.append(System.lineSeparator());
         }
         sb.append(")");
         return sb.toString();
+    }
+
+    public static void print(){
+        if(Main.DEBUG){
+            System.out.print("DEBUG: ");
+        }
+        System.out.println(strValue());
     }
 
 }

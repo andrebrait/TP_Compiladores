@@ -7,45 +7,52 @@ import com.piler.kecia.workers.Lexer;
 
 public class Main {
 
+    public static boolean DEBUG;
+
     public static void main(String[] args) {
 
-        if (args.length != 2) {
+        if (args.length < 2 || args.length > 3) {
             exibeErro();
             return;
         }
 
         Lexer lex = new Lexer(args[1]);
 
-        Token result = null;
+        DEBUG = "-d".equalsIgnoreCase(args[2]) || "--debug".equalsIgnoreCase(args[2]);
 
         switch (args[0]) {
             case "lexico":
                 System.out.println("Iniciando analisador léxico");
-                while (!(result instanceof EOFToken)) {
-                    result = lex.scan();
-                    if (result == null) {
-                        System.out.println("ERRO: Token inválido na linha " + String.valueOf(lex.getLine()) + ". Sequência de caracteres: [" + lex.getCharSeq().toString() + "].");
-                        continue;
-                    }
-                    if (!(result instanceof EOFToken)) {
-                        System.out.println("Token válido encontrado na linha " + String.valueOf(lex.getLine()) + ": " + result.toString());
-                    }
-                }
-
-                System.out.println("Fim do arquivo atingido: " + result.toString() + System.lineSeparator());
-
-                System.out.println(SymbolTable.strValue());
+                //Desativando modo DEBUG pois as mensagens do léxico sempre são exibidas se somente ele for executado
+                DEBUG = false;
+                lex.readWholeFile();
+                SymbolTable.print();
                 return;
             case "sintatico":
                 exibeNaoImplementado(args);
+                return;
+            case "semantico":
+                exibeNaoImplementado(args);
+                return;
+            case "codigo":
+                exibeNaoImplementado(args);
+                return;
             default:
                 exibeErro();
+                return;
         }
     }
 
     private static void exibeErro() {
         System.out.println("Argumentos errados!");
-        System.out.println("Uso correto: java -jar <nome_do_jar> <fase> <nome_do_arquivo>");
+        System.out.println("Uso correto: java -jar <nome_do_jar> <fase> <nome_do_arquivo> <opções>");
+        System.out.println("Fases válidas:");
+        System.out.println("\tlexico:\texecuta apenas o analisador léxico");
+        System.out.println("\tsintatico:\texecuta os analisadores léxico e sintático");
+        System.out.println("\tsemantico:\texecuta os analisadores léxico, sintático e semântico");
+        System.out.println("\tcodigo:\texecuta os analisadores léxico, sintático, semântico e geração de código");
+        System.out.println("Opções válidas:");
+        System.out.println("\t-d, --DEBUG:\tliga as mensagens de DEBUG para os analisadores sintático e semântico");
         return;
     }
 

@@ -10,6 +10,11 @@ import lombok.RequiredArgsConstructor;
 @Data
 public abstract class Token<V> {
 
+    private final static Token[] RELOP = {Operator.EQ, Operator.NEQ, Operator.GE, Operator.GT, Operator.LE, Operator.LT};
+    private final static Token[] ADDOP = {Operator.SUM, Operator.SUBT, Word.AND};
+    private final static Token[] MULOP = {Operator.MULT, Operator.DIV, Word.OR};
+    private final static Token[] TYPE = {Word.INT, Word.STRING};
+
     private final TokenValue<V> tokenValue;
     private final Tag tag;
 

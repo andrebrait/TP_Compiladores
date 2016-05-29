@@ -1,5 +1,7 @@
 package com.piler.kecia.datatypes;
 
+import lombok.Getter;
+
 /**
  * Created by andre on 22/04/16.
  */
@@ -49,7 +51,8 @@ public enum Tag {
     //Outros
     ID,
     NUM,
-    LITERAL;
+    LITERAL,
+    EOF;
 
     private static final int OFFSET = 256;
 

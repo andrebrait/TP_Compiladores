@@ -1,8 +1,10 @@
 package com.piler.kecia.workers;
 
+import com.piler.kecia.Main;
 import com.piler.kecia.datatypes.SymbolTable;
 import com.piler.kecia.datatypes.token.*;
 import lombok.Getter;
+import lombok.Setter;
 
 import java.io.EOFException;
 
@@ -11,7 +13,7 @@ import java.io.EOFException;
  */
 public class Lexer {
 
-    private CharacterHandler charHandl;
+    private final CharacterHandler charHandl;
 
     private boolean eof;
 
@@ -103,7 +105,36 @@ public class Lexer {
         refeed = true;
     }
 
-    public Token scan() {
+    public void readWholeFile(){
+        Token result;
+        do {
+            result = scan(true);
+        } while (!(result instanceof EOFToken));
+    }
+
+    public Token scan(){
+        return scan(Main.DEBUG);
+    }
+
+    private Token scan(boolean print){
+        Token tok = next();
+        if(print){
+            printMessage(tok);
+        }
+        return tok;
+    }
+
+    private void printMessage(Token result) {
+        if (result == null){
+            System.out.println("ERRO: Token inválido na linha " + String.valueOf(getLine()) + ". Sequência de caracteres: [" + getCharSeq().toString() + "].");
+        } else if (!(result instanceof EOFToken)) {
+            System.out.println((Main.DEBUG ? "DEBUG: " : "") + "Token válido encontrado na linha " + String.valueOf(getLine()) + ": " + result.toString());
+        } else {
+            System.out.println((Main.DEBUG ? "DEBUG: " : "") + "Fim do arquivo atingido: " + result.toString() + System.lineSeparator());
+        }
+    }
+
+    private Token next() {
 
         if (eof) {
             return new EOFToken();
