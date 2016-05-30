@@ -4,7 +4,6 @@ import com.piler.kecia.Main;
 import com.piler.kecia.datatypes.SymbolTable;
 import com.piler.kecia.datatypes.token.*;
 import lombok.Getter;
-import lombok.Setter;
 
 import java.io.EOFException;
 
@@ -126,7 +125,7 @@ public class Lexer {
 
     private void printMessage(Token result) {
         if (result == null){
-            System.out.println("ERRO: Token inválido na linha " + String.valueOf(getLine()) + ". Sequência de caracteres: [" + getCharSeq().toString() + "].");
+            System.out.println("INVALIDO: Token inválido na linha " + String.valueOf(getLine()) + ". Sequência de caracteres: [" + getCharSeq().toString() + "].");
         } else if (!(result instanceof EOFToken)) {
             System.out.println((Main.DEBUG ? "DEBUG: " : "") + "Token válido encontrado na linha " + String.valueOf(getLine()) + ": " + result.toString());
         } else {
