@@ -1,5 +1,6 @@
 package com.piler.kecia.workers;
 
+import com.piler.kecia.Main;
 import com.piler.kecia.datatypes.SymbolTable;
 import com.piler.kecia.datatypes.Tag;
 import com.piler.kecia.datatypes.token.EOFToken;
@@ -57,6 +58,7 @@ public class Syntatic {
     }
 
     private void eat(Tag t) {
+        printDebugMessage("eat", t, null);
         if (t.equals(tag())) {
             advance();
         } else {
@@ -64,25 +66,22 @@ public class Syntatic {
         }
     }
 
-    private void createError(Tag t) {
+    private void createError(Tag... tags) {
         StringBuilder sb = new StringBuilder();
-        sb.append("INVÁLIDO: Valor inválido na linha ");
+        sb.append("ERRO SINTÁTICO: Valor inválido na linha ");
         sb.append(lexer.getLine());
         sb.append(". Esperado ");
-        if (!SymbolTable.TOKEN_GROUP_MAP.containsKey(t)) {
-            sb.append(t);
+        if (tags.length == 1) {
+            sb.append(tags[0]);
         } else {
-            sb.append("um dos seguintes valores: ");
-            Token[] tokens = SymbolTable.TOKEN_GROUP_MAP.get(t);
-            for (int i = 0; i < tokens.length; i++) {
-                sb.append(tokens[i].getTokenValue().getValue());
-                sb.append(" (Tag=");
-                sb.append(tokens[i].getTag());
-                sb.append(")");
-                if (i < tokens.length - 1) {
+            sb.append("um dos seguintes tipos: [");
+            for (int i = 0; i < tags.length; i++) {
+                sb.append(tags[i]);
+                if (i < tags.length - 1) {
                     sb.append(", ");
                 }
             }
+            sb.append("]");
         }
         sb.append(". Encontrado: ");
         if (!(tok instanceof EOFToken)) {
@@ -97,13 +96,15 @@ public class Syntatic {
         System.out.println(sb.toString());
     }
 
-    private Runnable[] selectNextActions(Map<Tag, Runnable[]> map, boolean shouldThrowError) {
+    private Runnable[] selectNextActions(String phase, boolean shouldThrowError) {
         Tag t = tag();
+        Map<Tag, Runnable[]> map = stateMap.get(phase);
+        printDebugMessage(phase, null, map);
         if (map.containsKey(t)) {
             return map.get(t);
         }
         if (shouldThrowError) {
-            map.keySet().forEach(this::createError);
+            createError(map.keySet().toArray(new Tag[]{}));
             if (!t.equals(Tag.EOF)) {
                 //Trata como se tivesse retornado o token corretamente e daí prosseguido
                 advance();
@@ -113,14 +114,14 @@ public class Syntatic {
     }
 
     private void executeOne(String phase) {
-        Runnable[] actions = selectNextActions(stateMap.get(phase), true);
+        Runnable[] actions = selectNextActions(phase, true);
         if (actions != null) {
             run(actions);
         }
     }
 
     private void executeZeroOrOne(String phase) {
-        Runnable[] actions = selectNextActions(stateMap.get(phase), false);
+        Runnable[] actions = selectNextActions(phase, false);
         if (actions != null) {
             run(actions);
         }
@@ -128,9 +129,8 @@ public class Syntatic {
 
     private void executeMany(String phase) {
         Runnable[] actions;
-        Map<Tag, Runnable[]> map = stateMap.get(phase);
         do {
-            actions = selectNextActions(map, false);
+            actions = selectNextActions(phase, false);
             if (actions != null) {
                 run(actions);
             }
@@ -170,10 +170,13 @@ public class Syntatic {
     private void ident_list() {
         String phase = "ident_list";
         if (!stateMap.containsKey(phase)) {
-            put(phase, Tag.ID, () -> eat(Tag.ID));
+            put(phase, Tag.ID, () -> eat(Tag.ID), this::ident_list_2);
         }
         executeOne(phase);
-        phase = "ident_list_2";
+    }
+
+    private void ident_list_2() {
+        String phase = "ident_list_2";
         if (!stateMap.containsKey(phase)) {
             put(phase, Tag.COMMA, () -> eat(Tag.COMMA), () -> eat(Tag.ID));
         }
@@ -374,6 +377,27 @@ public class Syntatic {
             put(phase, Tag.LITERAL, () -> eat(Tag.LITERAL));
         }
         executeOne(phase);
+    }
+
+    private void printDebugMessage(String phase, Tag t, Map<Tag, Runnable[]> map) {
+        if (Main.DEBUG) {
+            StringBuilder sb = new StringBuilder();
+            sb.append("[");
+            if (t != null) {
+                sb.append(t);
+            } else {
+                int i = 0;
+                for (Tag k : map.keySet()) {
+                    sb.append(k);
+                    if (i < map.keySet().size() - 1) {
+                        sb.append(", ");
+                    }
+                    i++;
+                }
+            }
+            sb.append("]");
+            System.out.println("DEBUG: fase " + phase + ", Tags esperadas: " + sb.toString() + ", Token/Sequencia atual: " + tokenValue() + ", Tag atual: " + tag());
+        }
     }
 
     public void analyze() {
