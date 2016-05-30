@@ -17,7 +17,7 @@ public class Main {
 
         Lexer lex = new Lexer(args[1]);
 
-        DEBUG = (args.length == 2) && ("-d".equalsIgnoreCase(args[2]) || "--debug".equalsIgnoreCase(args[2]));
+        DEBUG = (args.length == 3) && ("-d".equalsIgnoreCase(args[2]) || "--debug".equalsIgnoreCase(args[2]));
 
         switch (args[0]) {
             case "lexico":
