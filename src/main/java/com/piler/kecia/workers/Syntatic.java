@@ -87,7 +87,7 @@ public class Syntatic {
         sb.append(". Encontrado: ");
         if (!(tok instanceof EOFToken)) {
             sb.append(tokenValue());
-            sb.append(" (Identificado como ");
+            sb.append(" (identificado como ");
             sb.append(tag());
             sb.append(")");
         } else {
