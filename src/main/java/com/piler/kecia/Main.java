@@ -46,10 +46,10 @@ public class Main {
         System.out.println("Argumentos errados!");
         System.out.println("Uso correto: java -jar <nome_do_jar> <fase> <nome_do_arquivo> <opções>");
         System.out.println("Fases válidas:");
-        System.out.println("\tlexico:\texecuta apenas o analisador léxico");
+        System.out.println("\tlexico:\t\texecuta apenas o analisador léxico");
         System.out.println("\tsintatico:\texecuta os analisadores léxico e sintático");
         System.out.println("\tsemantico:\texecuta os analisadores léxico, sintático e semântico");
-        System.out.println("\tcodigo:\texecuta os analisadores léxico, sintático, semântico e geração de código");
+        System.out.println("\tcodigo:\t\texecuta os analisadores léxico, sintático, semântico e geração de código");
         System.out.println("Opções válidas:");
         System.out.println("\t-d, --DEBUG:\tliga as mensagens de DEBUG para os analisadores sintático e semântico");
     }
