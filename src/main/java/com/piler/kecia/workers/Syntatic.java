@@ -66,7 +66,7 @@ public class Syntatic {
 
     private void createError(Tag t) {
         StringBuilder sb = new StringBuilder();
-        sb.append("INVALIDO: Valor inválido na linha ");
+        sb.append("INVÁLIDO: Valor inválido na linha ");
         sb.append(lexer.getLine());
         sb.append(". Esperado ");
         if (!SymbolTable.TOKEN_GROUP_MAP.containsKey(t)) {
