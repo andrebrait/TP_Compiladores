@@ -59,11 +59,10 @@ public class Syntatic {
 
     private void eat(Tag t) {
         printDebugMessage("eat", t, null);
-        if (t.equals(tag())) {
-            advance();
-        } else {
+        if (!t.equals(tag())) {
             createError(t);
         }
+        advance();
     }
 
     private void createError(Tag... tags) {
@@ -108,6 +107,7 @@ public class Syntatic {
             if (!t.equals(Tag.EOF)) {
                 //Trata como se tivesse retornado o token corretamente e daí prosseguido
                 advance();
+                return map.values().iterator().next();
             }
         }
         return null;
