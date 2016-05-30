@@ -1,14 +1,13 @@
 package com.piler.kecia.workers;
 
+import com.piler.kecia.datatypes.SymbolTable;
 import com.piler.kecia.datatypes.Tag;
 import com.piler.kecia.datatypes.token.EOFToken;
 import com.piler.kecia.datatypes.token.Token;
 import lombok.RequiredArgsConstructor;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Modifier;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Analisador sintático para a gramática MODIFICADA que consta no relatório.
@@ -18,9 +17,32 @@ import java.util.List;
 @RequiredArgsConstructor
 public class Syntatic {
 
-    private final List<String> errorList = new ArrayList<>();
     private final Lexer lexer;
+    private final Map<String, Map<Tag, Runnable[]>> stateMap = new HashMap<>();
     private Token<?> tok;
+
+    private void run(Runnable[] actions) {
+        for (Runnable r : actions) {
+            r.run();
+        }
+    }
+
+    private void put(String phase, Tag t, Runnable... actions) {
+        if (!stateMap.containsKey(phase)) {
+            stateMap.put(phase, new HashMap<>());
+        }
+        stateMap.get(phase).put(t, actions);
+    }
+
+    private void putMultiple(String phase, Tag[] tags, Runnable... actions) {
+        if (!stateMap.containsKey(phase)) {
+            stateMap.put(phase, new HashMap<>());
+        }
+        Map<Tag, Runnable[]> map = stateMap.get(phase);
+        for (Tag t : tags) {
+            map.put(t, actions);
+        }
+    }
 
     private Tag tag() {
         return tok != null ? tok.getTag() : Tag.INVALIDO;
@@ -42,40 +64,23 @@ public class Syntatic {
         }
     }
 
-    public void createError(Tag t) {
+    private void createError(Tag t) {
         StringBuilder sb = new StringBuilder();
         sb.append("INVALIDO: Valor inválido na linha ");
         sb.append(lexer.getLine());
         sb.append(". Esperado ");
-        if (t.equals(Tag.EOF)) {
-            sb.append(EOFToken.VALUE);
-        } else if (t.equals(Tag.ID)) {
-            sb.append("identificador");
-        } else if (t.equals(Tag.NUM)) {
-            sb.append("número inteiro");
-        } else if (t.equals(Tag.LITERAL)) {
-            sb.append("valor literal");
+        if (!SymbolTable.TOKEN_GROUP_MAP.containsKey(t)) {
+            sb.append(t);
         } else {
             sb.append("um dos seguintes valores: ");
-            ext:
-            for (Field f : Token.class.getFields()) {
-                if (Modifier.isStatic(f.getModifiers()) && Modifier.isFinal(f.getModifiers())) {
-                    try {
-                        Token[] fields = (Token[]) f.get(null);
-                        for (Token tk : fields) {
-                            if (t.equals(tk.getTag())) {
-                                for (int i = 0; i < fields.length; i++) {
-                                    sb.append(fields[i].getTokenValue().getValue());
-                                    if (i < fields.length - 1) {
-                                        sb.append(", ");
-                                    }
-                                }
-                                break ext;
-                            }
-                        }
-                    } catch (IllegalAccessException e) {
-                        // Não há essa possibilidade.
-                    }
+            Token[] tokens = SymbolTable.TOKEN_GROUP_MAP.get(t);
+            for (int i = 0; i < tokens.length; i++) {
+                sb.append(tokens[i].getTokenValue().getValue());
+                sb.append(" (Tag=");
+                sb.append(tokens[i].getTag());
+                sb.append(")");
+                if (i < tokens.length - 1) {
+                    sb.append(", ");
                 }
             }
         }
@@ -89,20 +94,17 @@ public class Syntatic {
             sb.append(EOFToken.VALUE);
         }
         sb.append(".");
-        errorList.add(sb.toString());
+        System.out.println(sb.toString());
     }
 
-    private State selectNextState(List<State> list, boolean shouldThrowError) {
-        for (State s : list) {
-            if (s.test(tag())) {
-                return s;
-            }
+    private Runnable[] selectNextActions(Map<Tag, Runnable[]> map, boolean shouldThrowError) {
+        Tag t = tag();
+        if (map.containsKey(t)) {
+            return map.get(t);
         }
         if (shouldThrowError) {
-            for (State s : list) {
-                createError(s.tag);
-            }
-            if (!tag().equals(Tag.EOF)) {
+            map.keySet().forEach(this::createError);
+            if (!t.equals(Tag.EOF)) {
                 //Trata como se tivesse retornado o token corretamente e daí prosseguido
                 advance();
             }
@@ -110,27 +112,29 @@ public class Syntatic {
         return null;
     }
 
-    private void addMultipleStates(List<State> list, Tag[] tags, Runnable... actions) {
-        for (Tag t : tags) {
-            list.add(new State(t, actions));
+    private void executeOne(String phase) {
+        Runnable[] actions = selectNextActions(stateMap.get(phase), true);
+        if (actions != null) {
+            run(actions);
         }
     }
 
-    private void executeOne(List<State> expected) {
-        State next = selectNextState(expected, true);
-        if (next != null) {
-            next.go();
+    private void executeZeroOrOne(String phase) {
+        Runnable[] actions = selectNextActions(stateMap.get(phase), false);
+        if (actions != null) {
+            run(actions);
         }
     }
 
-    private void executeMany(List<State> expected) {
-        State next = null;
+    private void executeMany(String phase) {
+        Runnable[] actions;
+        Map<Tag, Runnable[]> map = stateMap.get(phase);
         do {
-            next = selectNextState(expected, false);
-            if (next != null) {
-                next.go();
+            actions = selectNextActions(map, false);
+            if (actions != null) {
+                run(actions);
             }
-        } while (next != null);
+        } while (actions != null);
     }
 
     private void program() {
@@ -138,97 +142,242 @@ public class Syntatic {
         if (tok instanceof EOFToken) {
             return;
         }
-        List<State> expected = new ArrayList<>();
-        expected.add(new State(Tag.VAR, () -> eat(Tag.VAR), this::decl_list, () -> eat(Tag.BEGIN), this::stmt_list, () -> eat(Tag.END), () -> eat(Tag.EOF)));
-        expected.add(new State(Tag.BEGIN, () -> eat(Tag.BEGIN), this::stmt_list, () -> eat(Tag.END), () -> eat(Tag.EOF)));
-        executeOne(expected);
+        String phase = "program";
+        if (!stateMap.containsKey(phase)) {
+            put(phase, Tag.VAR, () -> eat(Tag.VAR), this::decl_list, () -> eat(Tag.BEGIN), this::stmt_list, () -> eat(Tag.END), () -> eat(Tag.EOF));
+            put(phase, Tag.BEGIN, () -> eat(Tag.BEGIN), this::stmt_list, () -> eat(Tag.END), () -> eat(Tag.EOF));
+        }
+        executeOne(phase);
     }
 
     private void decl_list() {
-        List<State> expected = new ArrayList<>();
-        expected.add(new State(Tag.ID, this::decl, () -> eat(Tag.SEMICOLON)));
-
-        executeOne(expected);
-        executeMany(expected);
+        String phase = "decl_list";
+        if (!stateMap.containsKey(phase)) {
+            put(phase, Tag.ID, this::decl, () -> eat(Tag.SEMICOLON));
+        }
+        executeOne(phase);
+        executeMany(phase);
     }
 
     private void decl() {
+        String phase = "decl";
+        if (!stateMap.containsKey(phase)) {
+            put(phase, Tag.ID, this::ident_list, () -> eat(Tag.IS), this::type);
+        }
+        executeOne(phase);
+    }
 
+    private void ident_list() {
+        String phase = "ident_list";
+        if (!stateMap.containsKey(phase)) {
+            put(phase, Tag.ID, () -> eat(Tag.ID));
+        }
+        executeOne(phase);
+        phase = "ident_list_2";
+        if (!stateMap.containsKey(phase)) {
+            put(phase, Tag.COMMA, () -> eat(Tag.COMMA), () -> eat(Tag.ID));
+        }
+        executeMany(phase);
+    }
+
+    private void type() {
+        String phase = "type";
+        if (!stateMap.containsKey(phase)) {
+            for (Tag t : SymbolTable.TYPE_TAG) {
+                put(phase, t, () -> eat(t));
+            }
+        }
+        executeOne(phase);
     }
 
     private void stmt_list() {
-        List<State> expected = new ArrayList<>();
-        addMultipleStates(expected, new Tag[]{Tag.ID, Tag.IF, Tag.DO, Tag.IN, Tag.OUT}, this::stmt, () -> eat(Tag.SEMICOLON));
-
-        executeOne(expected);
-        executeMany(expected);
+        String phase = "stmt_list";
+        if (!stateMap.containsKey(phase)) {
+            putMultiple(phase, new Tag[]{Tag.ID, Tag.IF, Tag.DO, Tag.IN, Tag.OUT}, this::stmt, () -> eat(Tag.SEMICOLON));
+        }
+        executeOne(phase);
+        executeMany(phase);
     }
 
     private void stmt() {
-        List<State> expected = new ArrayList<>();
-        expected.add(new State(Tag.ID, this::assign_stmt));
-        expected.add(new State(Tag.IF, this::if_stmt));
-        expected.add(new State(Tag.DO, this::do_stmt));
-        expected.add(new State(Tag.IN, this::read_stmt));
-        expected.add(new State(Tag.OUT, this::write_stmt));
-
-        executeOne(expected);
+        String phase = "stmt";
+        if (!stateMap.containsKey(phase)) {
+            put(phase, Tag.ID, this::assign_stmt);
+            put(phase, Tag.IF, this::if_stmt);
+            put(phase, Tag.DO, this::do_stmt);
+            put(phase, Tag.IN, this::read_stmt);
+            put(phase, Tag.OUT, this::write_stmt);
+        }
+        executeOne(phase);
     }
 
     private void assign_stmt() {
-        List<State> expected = new ArrayList<>();
-        expected.add(new State(Tag.ID, () -> eat(Tag.ID), () -> eat(Tag.ASSIGN), this::simple_expr));
+        String phase = "assign_stmt";
+        if (!stateMap.containsKey(phase)) {
+            put(phase, Tag.ID, () -> eat(Tag.ID), () -> eat(Tag.ASSIGN), this::simple_expr);
+        }
+        executeOne(phase);
+    }
 
-        executeOne(expected);
+    private void if_stmt() {
+        String phase = "if_stmt";
+        if (!stateMap.containsKey(phase)) {
+            put(phase, Tag.IF, () -> eat(Tag.IF), this::expression, () -> eat(Tag.THEN), this::stmt_list, this::if_stmt_cont);
+        }
+        executeOne(phase);
+    }
+
+    private void if_stmt_cont() {
+        String phase = "if_stmt_cont";
+        if (!stateMap.containsKey(phase)) {
+            put(phase, Tag.END, () -> eat(Tag.END));
+            put(phase, Tag.ELSE, () -> eat(Tag.ELSE), this::stmt_list, () -> eat(Tag.END));
+        }
+        executeOne(phase);
+    }
+
+    private void do_stmt() {
+        String phase = "do_stmt";
+        if (!stateMap.containsKey(phase)) {
+            put(phase, Tag.DO, () -> eat(Tag.DO), this::stmt_list, this::stmt_suffix);
+        }
+        executeOne(phase);
+    }
+
+    private void stmt_suffix() {
+        String phase = "stmt_suffix";
+        if (!stateMap.containsKey(phase)) {
+            put(phase, Tag.WHILE, () -> eat(Tag.WHILE), this::expression);
+        }
+        executeOne(phase);
+    }
+
+    private void read_stmt() {
+        String phase = "read_stmt";
+        if (!stateMap.containsKey(phase)) {
+            put(phase, Tag.IN, () -> eat(Tag.IN), () -> eat(Tag.OP_PAR), () -> eat(Tag.ID), () -> eat(Tag.CL_PAR));
+        }
+        executeOne(phase);
+    }
+
+    private void write_stmt() {
+        String phase = "write_stmt";
+        if (!stateMap.containsKey(phase)) {
+            put(phase, Tag.OUT, () -> eat(Tag.OUT), () -> eat(Tag.OP_PAR), this::simple_expr, () -> eat(Tag.CL_PAR));
+        }
+        executeOne(phase);
+    }
+
+    private void expression() {
+        String phase = "expression";
+        if (!stateMap.containsKey(phase)) {
+            putMultiple(phase, new Tag[]{Tag.ID, Tag.NUM, Tag.LITERAL, Tag.OP_PAR, Tag.NOT, Tag.SUBT}, this::simple_expr, this::expression_cont);
+        }
+        executeOne(phase);
+    }
+
+    private void expression_cont() {
+        String phase = "expression_cont";
+        if (!stateMap.containsKey(phase)) {
+            putMultiple(phase, SymbolTable.RELOP_TAG, this::relop, this::simple_expr);
+        }
+        executeZeroOrOne(phase);
     }
 
     //Alterada por causa de recursão à esquerda
     private void simple_expr() {
-
-    }
-
-    private void term() {
-
+        String phase = "simple_expr";
+        if (!stateMap.containsKey(phase)) {
+            putMultiple(phase, new Tag[]{Tag.ID, Tag.NUM, Tag.LITERAL, Tag.OP_PAR, Tag.NOT, Tag.SUBT}, this::term, this::simple_expr_linha);
+        }
+        executeOne(phase);
     }
 
     private void simple_expr_linha() {
-
-    }
-
-    private void if_stmt() {
-
-    }
-
-    private void do_stmt() {
-
-    }
-
-    private void read_stmt() {
-
-    }
-
-    private void write_stmt() {
-
-    }
-
-    private static class State {
-        private final Tag tag;
-        private final Runnable[] actions;
-
-        private State(Tag t, Runnable... actions) {
-            this.tag = t;
-            this.actions = actions;
+        String phase = "simple_expr_linha";
+        if (!stateMap.containsKey(phase)) {
+            putMultiple(phase, SymbolTable.ADDOP_TAG, this::addop, this::term, this::simple_expr_linha);
         }
+        executeZeroOrOne(phase);
+    }
 
-        private boolean test(Tag t) {
-            return tag.equals(t);
+    private void term() {
+        String phase = "term";
+        if (!stateMap.containsKey(phase)) {
+            putMultiple(phase, new Tag[]{Tag.ID, Tag.NUM, Tag.LITERAL, Tag.OP_PAR, Tag.NOT, Tag.SUBT}, this::factor_a, this::term_linha);
         }
+        executeOne(phase);
+    }
 
-        private void go() {
-            for (Runnable r : actions) {
-                r.run();
+    private void term_linha() {
+        String phase = "term_linha";
+        if (!stateMap.containsKey(phase)) {
+            putMultiple(phase, SymbolTable.MULOP_TAG, this::mulop, this::factor_a, this::term_linha);
+        }
+        executeZeroOrOne(phase);
+    }
+
+    private void factor_a() {
+        String phase = "factor_a";
+        if (!stateMap.containsKey(phase)) {
+            putMultiple(phase, new Tag[]{Tag.ID, Tag.NUM, Tag.LITERAL, Tag.OP_PAR}, this::factor);
+            put(phase, Tag.NOT, () -> eat(Tag.NOT), this::factor);
+            put(phase, Tag.SUBT, () -> eat(Tag.SUBT), this::factor);
+        }
+        executeOne(phase);
+    }
+
+    private void factor() {
+        String phase = "factor";
+        if (!stateMap.containsKey(phase)) {
+            put(phase, Tag.ID, () -> eat(Tag.ID));
+            putMultiple(phase, new Tag[]{Tag.NUM, Tag.LITERAL}, this::constant);
+            put(phase, Tag.OP_PAR, () -> eat(Tag.OP_PAR), this::expression, () -> eat(Tag.CL_PAR));
+        }
+        executeOne(phase);
+    }
+
+    private void relop() {
+        String phase = "relop";
+        if (!stateMap.containsKey(phase)) {
+            for (Tag t : SymbolTable.RELOP_TAG) {
+                put(phase, t, () -> eat(t));
             }
         }
+        executeOne(phase);
+    }
+
+    private void addop() {
+        String phase = "addop";
+        if (!stateMap.containsKey(phase)) {
+            for (Tag t : SymbolTable.ADDOP_TAG) {
+                put(phase, t, () -> eat(t));
+            }
+        }
+        executeOne(phase);
+    }
+
+    private void mulop() {
+        String phase = "mulop";
+        if (!stateMap.containsKey(phase)) {
+            for (Tag t : SymbolTable.MULOP_TAG) {
+                put(phase, t, () -> eat(t));
+            }
+        }
+        executeOne(phase);
+    }
+
+    private void constant() {
+        String phase = "constant";
+        if (!stateMap.containsKey(phase)) {
+            put(phase, Tag.NUM, () -> eat(Tag.NUM));
+            put(phase, Tag.LITERAL, () -> eat(Tag.LITERAL));
+        }
+        executeOne(phase);
+    }
+
+    public void analyze() {
+        program();
     }
 
 }

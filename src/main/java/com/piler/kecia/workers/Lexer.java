@@ -104,7 +104,7 @@ public class Lexer {
         refeed = true;
     }
 
-    public void readWholeFile(){
+    public void analyze() {
         Token result;
         do {
             result = scan(true);

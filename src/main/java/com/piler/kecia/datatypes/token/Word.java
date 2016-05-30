@@ -30,7 +30,7 @@ public class Word extends Token<String> {
     public static final Word OR = new Word("or", Tag.OR);
     public static final Word AND = new Word("and", Tag.AND);
 
-    public Word(String lexeme, Tag tag) {
+    Word(String lexeme, Tag tag) {
         super(lexeme, tag);
     }
 

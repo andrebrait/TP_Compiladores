@@ -1,9 +1,8 @@
 package com.piler.kecia;
 
 import com.piler.kecia.datatypes.SymbolTable;
-import com.piler.kecia.datatypes.token.EOFToken;
-import com.piler.kecia.datatypes.token.Token;
 import com.piler.kecia.workers.Lexer;
+import com.piler.kecia.workers.Syntatic;
 
 public class Main {
 
@@ -25,11 +24,12 @@ public class Main {
                 System.out.println("Iniciando analisador léxico");
                 //Desativando modo DEBUG pois as mensagens do léxico sempre são exibidas se somente ele for executado
                 DEBUG = false;
-                lex.readWholeFile();
+                lex.analyze();
                 SymbolTable.print();
                 return;
             case "sintatico":
-                exibeNaoImplementado(args);
+                Syntatic synt = new Syntatic(lex);
+                synt.analyze();
                 return;
             case "semantico":
                 exibeNaoImplementado(args);
