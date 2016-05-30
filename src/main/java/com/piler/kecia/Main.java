@@ -39,7 +39,6 @@ public class Main {
                 return;
             default:
                 exibeErro();
-                return;
         }
     }
 
@@ -53,12 +52,10 @@ public class Main {
         System.out.println("\tcodigo:\texecuta os analisadores léxico, sintático, semântico e geração de código");
         System.out.println("Opções válidas:");
         System.out.println("\t-d, --DEBUG:\tliga as mensagens de DEBUG para os analisadores sintático e semântico");
-        return;
     }
 
     private static void exibeNaoImplementado(String[] args) {
         System.out.println("Fase de compilação ainda não implementada!");
         System.out.println("Fase selecionada: " + args[1]);
-        return;
     }
 }
