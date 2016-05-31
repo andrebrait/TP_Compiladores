@@ -107,7 +107,6 @@ public class Syntatic {
             if (!t.equals(Tag.EOF)) {
                 //Trata como se tivesse retornado o token corretamente e daí prosseguido
                 advance();
-                return map.values().iterator().next();
             }
         }
         return null;
@@ -144,7 +143,15 @@ public class Syntatic {
         }
         String phase = "program";
         if (!stateMap.containsKey(phase)) {
-            put(phase, Tag.VAR, () -> eat(Tag.VAR), this::decl_list, () -> eat(Tag.BEGIN), this::stmt_list, () -> eat(Tag.END), () -> eat(Tag.EOF));
+            put(phase, Tag.VAR, () -> eat(Tag.VAR), this::decl_list, this::begin);
+            put(phase, Tag.BEGIN, this::begin);
+        }
+        executeOne(phase);
+    }
+
+    private void begin() {
+        String phase = "begin";
+        if (!stateMap.containsKey(phase)) {
             put(phase, Tag.BEGIN, () -> eat(Tag.BEGIN), this::stmt_list, () -> eat(Tag.END), () -> eat(Tag.EOF));
         }
         executeOne(phase);
