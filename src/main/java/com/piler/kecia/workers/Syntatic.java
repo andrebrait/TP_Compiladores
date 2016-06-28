@@ -3,7 +3,9 @@ package com.piler.kecia.workers;
 import com.piler.kecia.Main;
 import com.piler.kecia.datatypes.SymbolTable;
 import com.piler.kecia.datatypes.Tag;
+import com.piler.kecia.datatypes.Type;
 import com.piler.kecia.datatypes.token.EOFToken;
+import com.piler.kecia.datatypes.token.Identifier;
 import com.piler.kecia.datatypes.token.Token;
 import lombok.RequiredArgsConstructor;
 
@@ -18,7 +20,10 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class Syntatic {
 
+    private final static int SEMANTIC_UNDECLARED = 0, SEMANTIC_WRONG_TYPE = 1;
+
     private final Lexer lexer;
+    private final boolean validateSemantics;
     private final Map<String, Map<Tag, Runnable[]>> stateMap = new HashMap<>();
     private Token<?> tok;
 
@@ -47,6 +52,10 @@ public class Syntatic {
 
     private Tag tag() {
         return tok != null ? tok.getTag() : Tag.INVALIDO;
+    }
+
+    private Type tokenType() {
+        return tok != null && tok instanceof Identifier ? ((Identifier) SymbolTable.getToken((String) tokenValue())).getType() : null;
     }
 
     private Object tokenValue() {
@@ -95,6 +104,27 @@ public class Syntatic {
         System.out.println(sb.toString());
     }
 
+    private void createSemanticError(int codigoErro, Type type) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("ERRO SEMÂNTICO: ");
+        sb.append("Identificador ");
+        sb.append(tokenValue());
+        sb.append(" (linha ");
+        sb.append(lexer.getLine());
+        sb.append(") ");
+        switch (codigoErro) {
+            case SEMANTIC_UNDECLARED:
+                sb.append("não declarado anteriormente.");
+                break;
+            case SEMANTIC_WRONG_TYPE:
+                sb.append("não é do tipo esperado: ");
+                sb.append(type);
+                sb.append(".");
+                break;
+        }
+        System.out.println(sb.toString());
+    }
+
     private Runnable[] selectNextActions(String phase, boolean shouldThrowError) {
         Tag t = tag();
         Map<Tag, Runnable[]> map = stateMap.get(phase);
@@ -134,6 +164,14 @@ public class Syntatic {
                 run(actions);
             }
         } while (actions != null);
+    }
+
+    private void semantic_check_declaration(){
+        
+    }
+
+    private void semantic_check_type(){
+
     }
 
     private void program() {

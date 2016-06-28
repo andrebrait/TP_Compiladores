@@ -15,7 +15,6 @@ public class Lexer {
     private final CharacterHandler charHandl;
 
     private boolean eof;
-
     private boolean refeed;
 
     @Getter
@@ -328,12 +327,7 @@ public class Lexer {
             if (numUnderscore > 1 || equals(value, "_") || numUnderscore == 1 && !beginsWith(value, '_') || value.length() > 15) {
                 return null;
             }
-            if (SymbolTable.hasToken(value)) {
-                return SymbolTable.getToken(value);
-            }
-            Identifier id = new Identifier(value);
-            SymbolTable.putToken(id);
-            return id;
+            return new Identifier(value);
         }
 
         return null;

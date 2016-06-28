@@ -28,11 +28,10 @@ public class Main {
                 SymbolTable.print();
                 return;
             case "sintatico":
-                Syntatic synt = new Syntatic(lex);
-                synt.analyze();
+                new Syntatic(lex, false).analyze();
                 return;
             case "semantico":
-                exibeNaoImplementado(args);
+                new Syntatic(lex, true).analyze();
                 return;
             case "codigo":
                 exibeNaoImplementado(args);
