@@ -12,7 +12,7 @@ import lombok.ToString;
 @Data
 @EqualsAndHashCode(callSuper = true)
 @ToString(callSuper = true)
-public class Identifier extends Word {
+public class Identifier extends Word implements TypedToken {
 
     private Type type;
 
