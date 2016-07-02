@@ -2,7 +2,6 @@ package com.piler.kecia.datatypes;
 
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
-import lombok.Data;
 
 /**
  * Created by andre on 28/06/16.
@@ -14,7 +13,8 @@ public enum Type {
     INTEGER(Tag.INT, 4),
     STRING(Tag.STRING, 1),
     VOID(null, null),
-    ERROR(null, null);
+    ERROR(null, null),
+    SYNTAX_ERROR(null, null);
 
     private Tag tag;
     private Integer length;

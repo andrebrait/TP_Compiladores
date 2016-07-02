@@ -2,6 +2,7 @@ package com.piler.kecia.datatypes.token;
 
 import com.piler.kecia.datatypes.Tag;
 import com.piler.kecia.datatypes.Type;
+import com.piler.kecia.datatypes.TypedExpression;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
@@ -12,7 +13,7 @@ import lombok.ToString;
 @Data
 @EqualsAndHashCode(callSuper = true)
 @ToString(callSuper = true)
-public class Identifier extends Word implements TypedToken {
+public class Identifier extends Word implements TypedExpression {
 
     private Type type;
 

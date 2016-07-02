@@ -4,6 +4,7 @@ import com.piler.kecia.Main;
 import com.piler.kecia.datatypes.SymbolTable;
 import com.piler.kecia.datatypes.Tag;
 import com.piler.kecia.datatypes.Type;
+import com.piler.kecia.datatypes.TypedExpression;
 import com.piler.kecia.datatypes.token.EOFToken;
 import com.piler.kecia.datatypes.token.Identifier;
 import com.piler.kecia.datatypes.token.Token;
@@ -55,7 +56,14 @@ public class Syntatic {
     }
 
     private Type tokenType() {
-        return tok != null && tok instanceof Identifier ? ((Identifier) SymbolTable.getToken((String) tokenValue())).getType() : null;
+        if (tok instanceof TypedExpression) {
+            if (tok instanceof Identifier) {
+                return ((Identifier) SymbolTable.getToken(((Identifier) tok).getTokenValue())).getType();
+            } else {
+                return ((TypedExpression) tok).getType();
+            }
+        }
+        return null;
     }
 
     private Object tokenValue() {
@@ -69,31 +77,20 @@ public class Syntatic {
     private void eat(Tag t) {
         printDebugMessage("eat", t, null);
         if (!t.equals(tag())) {
-            createError(t);
+            createSyntaxError(t);
         }
         advance();
     }
 
-    private void createError(Tag... tags) {
+    private void createSyntaxError(Tag... tags) {
         StringBuilder sb = new StringBuilder();
         sb.append("ERRO SINTÁTICO: Valor inválido na linha ");
         sb.append(lexer.getLine());
         sb.append(". Esperado ");
-        if (tags.length == 1) {
-            sb.append(tags[0]);
-        } else {
-            sb.append("um dos seguintes tipos: [");
-            for (int i = 0; i < tags.length; i++) {
-                sb.append(tags[i]);
-                if (i < tags.length - 1) {
-                    sb.append(", ");
-                }
-            }
-            sb.append("]");
-        }
+        generateMultipleTypesMessage(sb, tags);
         sb.append(". Encontrado: ");
         if (!(tok instanceof EOFToken)) {
-            sb.append(tokenValue());
+            sb.append(tokenValue()); //FIXME Pegar tipos de expressões também!
             sb.append(" (identificado como ");
             sb.append(tag());
             sb.append(")");
@@ -104,25 +101,43 @@ public class Syntatic {
         System.out.println(sb.toString());
     }
 
-    private void createSemanticError(int codigoErro, Type type) {
+    private void createSemanticError(int codigoErro, Type... type) {
         StringBuilder sb = new StringBuilder();
         sb.append("ERRO SEMÂNTICO: ");
-        sb.append("Identificador ");
-        sb.append(tokenValue());
-        sb.append(" (linha ");
-        sb.append(lexer.getLine());
-        sb.append(") ");
         switch (codigoErro) {
             case SEMANTIC_UNDECLARED:
-                sb.append("não declarado anteriormente.");
+                sb.append("Identificador ");
+                sb.append(tokenValue());
+                sb.append(" (linha ");
+                sb.append(lexer.getLine());
+                sb.append(") não declarado anteriormente.");
                 break;
             case SEMANTIC_WRONG_TYPE:
-                sb.append("não é do tipo esperado: ");
-                sb.append(type);
+                sb.append("Operação entre tipos incompatíveis. Encontrado ");
+                sb.append(tokenType());
+                sb.append(" quando o esperado era ");
+                generateMultipleTypesMessage(sb, type);
                 sb.append(".");
                 break;
+            default:
+                return;
         }
         System.out.println(sb.toString());
+    }
+
+    private void generateMultipleTypesMessage(StringBuilder sb, Object[] type) {
+        if (type.length == 1) {
+            sb.append(type[0]);
+        } else {
+            sb.append("um dos seguintes tipos: [");
+            for (int i = 0; i < type.length; i++) {
+                sb.append(type[i]);
+                if (i < type.length - 1) {
+                    sb.append(", ");
+                }
+            }
+            sb.append("]");
+        }
     }
 
     private Runnable[] selectNextActions(String phase, boolean shouldThrowError) {
@@ -133,7 +148,7 @@ public class Syntatic {
             return map.get(t);
         }
         if (shouldThrowError) {
-            createError(map.keySet().toArray(new Tag[]{}));
+            createSyntaxError(map.keySet().toArray(new Tag[]{}));
             if (!t.equals(Tag.EOF)) {
                 //Trata como se tivesse retornado o token corretamente e daí prosseguido
                 advance();
@@ -164,14 +179,6 @@ public class Syntatic {
                 run(actions);
             }
         } while (actions != null);
-    }
-
-    private void semantic_check_declaration(){
-        
-    }
-
-    private void semantic_check_type(){
-
     }
 
     private void program() {

@@ -1,7 +1,9 @@
 package com.piler.kecia.datatypes;
 
 import com.piler.kecia.Main;
+import com.piler.kecia.datatypes.token.Identifier;
 import com.piler.kecia.datatypes.token.Token;
+import com.piler.kecia.datatypes.token.Token.TokenValue;
 import com.piler.kecia.datatypes.token.Word;
 
 import java.lang.reflect.Field;
@@ -19,26 +21,34 @@ public class SymbolTable {
     public final static Tag[] MULOP_TAG = {Tag.MULT, Tag.DIV, Tag.OR};
     public final static Tag[] TYPE_TAG = {Tag.INT, Tag.STRING};
 
-    private final static Map<Token.TokenValue<String>, Word> TOKEN_MAP = new LinkedHashMap<>();
+    private final static Map<TokenValue<String>, Word> TOKEN_MAP = new LinkedHashMap<>();
 
-    public static boolean hasToken(Token.TokenValue<String> tokenValue) {
+    public static boolean hasToken(TokenValue<String> tokenValue) {
         return TOKEN_MAP.containsKey(tokenValue);
     }
 
     public static boolean hasToken(String value) {
-        return TOKEN_MAP.containsKey(new Token.TokenValue<>(value));
+        return hasToken(new TokenValue<>(value));
     }
 
     public static void putToken(Word token) {
         TOKEN_MAP.put(token.getTokenValue(), token);
     }
 
-    public static Word getToken(Token.TokenValue<String> tokenValue) {
+    public static Word getToken(TokenValue<String> tokenValue) {
         return TOKEN_MAP.get(tokenValue);
     }
 
     public static Word getToken(String value) {
-        return TOKEN_MAP.get(new Token.TokenValue<>(value));
+        return getToken(new TokenValue<>(value));
+    }
+
+    public static boolean isDeclaredId(TokenValue<String> tokenValue) {
+        return hasToken(tokenValue) && getToken(tokenValue) instanceof Identifier;
+    }
+
+    public static boolean isDeclaredId(String value) {
+        return isDeclaredId(new TokenValue<>(value));
     }
 
     public static void initialize() {
@@ -54,11 +64,15 @@ public class SymbolTable {
         }
     }
 
+    public static boolean isDeclared(TokenValue<String> tokenValue) {
+        return TOKEN_MAP.containsKey(tokenValue);
+    }
+
     private static String strValue() {
         StringBuilder sb = new StringBuilder();
         sb.append("SymbolTable(");
         sb.append(System.lineSeparator());
-        for (Map.Entry<Token.TokenValue<String>, Word> entry : TOKEN_MAP.entrySet()) {
+        for (Map.Entry<TokenValue<String>, Word> entry : TOKEN_MAP.entrySet()) {
             sb.append("\tValue=");
             sb.append(entry.getKey().getValue());
             sb.append(", Token(Tag=");
