@@ -433,7 +433,6 @@ public class Syntatic {
                 if (whileOk == SYNTAX_OK && notNullOrErrors(exprType)) {
                     //Se não houve erro de sintaxe (ou semântico dentro de expression), então validar semântica.
                     if (!exprType.equals(Type.BOOLEAN)) {
-                        expression_stack.peek()[0] = Type.ERROR;
                         createSemanticError(SEMANTIC_WRONG_TYPE, null, exprType, line, Type.BOOLEAN);
                     }
                 }
@@ -445,7 +444,20 @@ public class Syntatic {
     private void read_stmt() {
         String phase = "read_stmt";
         if (!stateMap.containsKey(phase)) {
-            put(phase, Tag.IN, () -> eat(Tag.IN), () -> eat(Tag.OP_PAR), () -> eat(Tag.ID), () -> eat(Tag.CL_PAR));
+            put(phase, Tag.IN, () -> {
+                int eatIn = eat(Tag.IN);
+                int eatOpPar = eat(Tag.OP_PAR);
+                Integer line = lexer.getLine();
+                Token tk = tok[0];
+                int eatId = eat(Tag.ID);
+                int eatClPar = eat(Tag.CL_PAR);
+                if (eatIn == SYNTAX_OK && eatOpPar == SYNTAX_OK && eatId == SYNTAX_OK && eatClPar == SYNTAX_OK) {
+                    Identifier id = (Identifier) tk;
+                    if (!SymbolTable.isDeclared(id.getTokenValue())) {
+                        createSemanticError(SEMANTIC_UNDECLARED, id, null, line);
+                    }
+                }
+            });
         }
         executeOne(phase);
     }
@@ -629,8 +641,7 @@ public class Syntatic {
                 Integer line = lexer.getLine();
                 Token actual = tok[0];
                 Type t = tokenType(actual);
-                int eatOk = eat(Tag.ID);
-                if (eatOk == SYNTAX_OK) {
+                if (eat(Tag.ID) == SYNTAX_OK) {
                     if (t.equals(Type.UNDECLARED_ID)) {
                         factor_stack.peek()[0] = Type.ERROR;
                         createSemanticError(SEMANTIC_UNDECLARED, actual, null, line);
