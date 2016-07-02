@@ -19,6 +19,7 @@ public class Num extends Token<Integer> implements TypedExpression {
 
     public Num(Integer value) {
         super(value, Tag.NUM);
+        this.type = Type.INTEGER;
     }
 
 }

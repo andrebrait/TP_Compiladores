@@ -19,6 +19,7 @@ public class Literal extends Word implements TypedExpression {
 
     public Literal(String value) {
         super(value, Tag.LITERAL);
+        this.type = Type.STRING;
     }
 
 }

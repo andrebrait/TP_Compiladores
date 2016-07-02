@@ -16,6 +16,7 @@ import lombok.ToString;
 public class Identifier extends Word implements TypedExpression {
 
     private Type type;
+    private Integer declarationLine;
 
     public Identifier(String value) {
         super(value, Tag.ID);

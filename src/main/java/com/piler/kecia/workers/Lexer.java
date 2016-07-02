@@ -110,25 +110,25 @@ public class Lexer {
         } while (!(result instanceof EOFToken));
     }
 
-    public Token scan(){
+    public Token scan() {
         return scan(Main.DEBUG);
     }
 
-    private Token scan(boolean print){
+    private Token scan(boolean print) {
         Token tok = next();
-        if(print){
+        if (print) {
             printMessage(tok);
         }
         return tok;
     }
 
     private void printMessage(Token result) {
-        if (result == null){
-            System.out.println("ERRO LÉXICO: Token inválido na linha " + String.valueOf(getLine()) + ". Sequência de caracteres: [" + getCharSeq().toString() + "].");
+        if (result == null) {
+            System.out.println("ERRO LÉXICO (Linha " + String.valueOf(getLine()) + "): Token inválido. Sequência de caracteres: [" + getCharSeq().toString() + "].");
         } else if (!(result instanceof EOFToken)) {
-            System.out.println((Main.DEBUG ? "DEBUG: " : "") + "Token válido encontrado na linha " + String.valueOf(getLine()) + ": " + result.toString());
+            System.out.println((Main.DEBUG ? "DEBUG " : "") + "(Linha " + String.valueOf(getLine()) + "): Token válido encontrado " + result.toString());
         } else {
-            System.out.println((Main.DEBUG ? "DEBUG: " : "") + "Fim do arquivo atingido: " + result.toString() + System.lineSeparator());
+            System.out.println((Main.DEBUG ? "DEBUG " : "") + "(Linha " + String.valueOf(getLine()) + "): Fim do arquivo atingido: " + result.toString() + System.lineSeparator());
         }
     }
 
@@ -326,6 +326,9 @@ public class Lexer {
             int numUnderscore = countMatches(value, '_');
             if (numUnderscore > 1 || equals(value, "_") || numUnderscore == 1 && !beginsWith(value, '_') || value.length() > 15) {
                 return null;
+            }
+            if (SymbolTable.hasToken(value)) {
+                return SymbolTable.getToken(value);
             }
             return new Identifier(value);
         }

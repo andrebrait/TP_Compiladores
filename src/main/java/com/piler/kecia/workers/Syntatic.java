@@ -8,10 +8,10 @@ import com.piler.kecia.datatypes.TypedExpression;
 import com.piler.kecia.datatypes.token.EOFToken;
 import com.piler.kecia.datatypes.token.Identifier;
 import com.piler.kecia.datatypes.token.Token;
+import com.piler.kecia.datatypes.token.Word;
 import lombok.RequiredArgsConstructor;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Analisador sintático para a gramática MODIFICADA que consta no relatório.
@@ -21,12 +21,32 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class Syntatic {
 
-    private final static int SEMANTIC_UNDECLARED = 0, SEMANTIC_WRONG_TYPE = 1;
+    /*
+    Nas funções que retornam Type, retorno nulo significa erro sintático.
+    Já ERROR significa ter havido algum erro semântico numa expressão interna a ela.
+     */
+
+    private final static int SEMANTIC_UNDECLARED = 0, SEMANTIC_DECLARED_REPEAT = 1, SEMANTIC_WRONG_TYPE = 2;
+    private final static int SYNTAX_OK = 0, SYNTAX_ERROR = 1;
 
     private final Lexer lexer;
     private final boolean validateSemantics;
     private final Map<String, Map<Tag, Runnable[]>> stateMap = new HashMap<>();
-    private Token<?> tok;
+    private final Token<?> tok[] = new Token[1];
+    private final List<Identifier> identListTemp = new ArrayList<>();
+    private final Stack<Type[]> type_stack = new Stack<>();
+    private final Stack<Type[]> expression_stack = new Stack<>();
+    private final Stack<Type[]> expression_cont_stack = new Stack<>();
+    private final Stack<Type[]> simple_expr_stack = new Stack<>();
+    private final Stack<Type[]> simple_expr_linha_stack = new Stack<>();
+    private final Stack<Type[]> term_stack = new Stack<>();
+    private final Stack<Type[]> term_linha_stack = new Stack<>();
+    private final Stack<Type[]> factor_a_stack = new Stack<>();
+    private final Stack<Type[]> factor_stack = new Stack<>();
+    private final Stack<Type[]> relop_stack = new Stack<>();
+    private final Stack<Type[]> addop_stack = new Stack<>();
+    private final Stack<Type[]> mulop_stack = new Stack<>();
+    private final Stack<Type[]> constant_stack = new Stack<>();
 
     private void run(Runnable[] actions) {
         for (Runnable r : actions) {
@@ -51,50 +71,63 @@ public class Syntatic {
         }
     }
 
-    private Tag tag() {
-        return tok != null ? tok.getTag() : Tag.INVALIDO;
+    private Tag tag(Token t) {
+        return t != null ? t.getTag() : Tag.INVALIDO;
     }
 
-    private Type tokenType() {
-        if (tok instanceof TypedExpression) {
-            if (tok instanceof Identifier) {
-                return ((Identifier) SymbolTable.getToken(((Identifier) tok).getTokenValue())).getType();
+    private Type tokenType(Token t) {
+        if (t == null) {
+            return Type.ERROR;
+        }
+        if (t instanceof TypedExpression) {
+            if (t instanceof Identifier) {
+                if (SymbolTable.isDeclaredId(((Identifier) t).getTokenValue())) {
+                    return ((Identifier) SymbolTable.getToken(((Identifier) t).getTokenValue())).getType();
+                } else {
+                    return Type.UNDECLARED_ID;
+                }
             } else {
-                return ((TypedExpression) tok).getType();
+                return ((TypedExpression) t).getType();
+            }
+        } else if (t instanceof Word) {
+            if (t.getTag().equals(Tag.INT)) {
+                return Type.INTEGER;
+            } else if (t.getTag().equals(Tag.STRING)) {
+                return Type.STRING;
             }
         }
-        return null;
+        return Type.VOID;
     }
 
-    private Object tokenValue() {
-        return tok != null ? tok.getTokenValue().getValue() : lexer.getCharSeq().toString();
+    private Object tokenValue(Token t) {
+        return t != null ? t.getTokenValue().getValue() : lexer.getCharSeq().toString();
     }
 
     private void advance() {
-        tok = lexer.scan();
+        tok[0] = lexer.scan();
     }
 
-    private Type eat(Tag t) {
+    private int eat(Tag t) {
         printDebugMessage("eat", t, null);
-        if (!t.equals(tag())) {
+        if (!t.equals(tag(tok[0]))) {
             createSyntaxError(t);
+            return SYNTAX_ERROR;
         }
         advance();
+        return SYNTAX_OK;
     }
-
-    //FIXME As regiões com semântica tem que ser colocadas em um único runnable gigante em vez de ficar em lista
 
     private void createSyntaxError(Tag... tags) {
         StringBuilder sb = new StringBuilder();
-        sb.append("ERRO SINTÁTICO: Valor inválido na linha ");
+        sb.append("ERRO SINTÁTICO (Linha ");
         sb.append(lexer.getLine());
-        sb.append(". Esperado ");
+        sb.append("): Valor inválido. Esperado ");
         generateMultipleTypesMessage(sb, tags);
         sb.append(". Encontrado: ");
-        if (!(tok instanceof EOFToken)) {
-            sb.append(tokenValue()); //FIXME Pegar tipos de expressões também!
+        if (!(tok[0] instanceof EOFToken)) {
+            sb.append(tokenValue(tok[0]));
             sb.append(" (identificado como ");
-            sb.append(tag());
+            sb.append(tag(tok[0]));
             sb.append(")");
         } else {
             sb.append(EOFToken.VALUE);
@@ -103,22 +136,39 @@ public class Syntatic {
         System.out.println(sb.toString());
     }
 
-    private void createSemanticError(int codigoErro, Type... type) {
+    private void createSemanticError(int codigoErro, Token token, Type foundType, Integer line, Type... expectedTypes) {
+        if (!validateSemantics) {
+            return;
+        }
         StringBuilder sb = new StringBuilder();
-        sb.append("ERRO SEMÂNTICO: ");
+        sb.append("ERRO SEMÂNTICO (Linha ");
+        sb.append(line);
+        sb.append("): ");
         switch (codigoErro) {
             case SEMANTIC_UNDECLARED:
                 sb.append("Identificador ");
-                sb.append(tokenValue());
+                sb.append(tokenValue(token));
                 sb.append(" (linha ");
-                sb.append(lexer.getLine());
+                sb.append(line);
                 sb.append(") não declarado anteriormente.");
+                break;
+            case SEMANTIC_DECLARED_REPEAT:
+                sb.append("Identificador ");
+                sb.append(tokenValue(token));
+                sb.append(" (linha ");
+                sb.append(line);
+                sb.append(") declarado mais de uma vez.");
                 break;
             case SEMANTIC_WRONG_TYPE:
                 sb.append("Operação entre tipos incompatíveis. Encontrado ");
-                sb.append(tokenType());
+                if (token != null) {
+                    sb.append("token ");
+                    sb.append(tokenValue(token));
+                    sb.append(" do tipo ");
+                }
+                sb.append(foundType);
                 sb.append(" quando o esperado era ");
-                generateMultipleTypesMessage(sb, type);
+                generateMultipleTypesMessage(sb, expectedTypes);
                 sb.append(".");
                 break;
             default:
@@ -127,14 +177,14 @@ public class Syntatic {
         System.out.println(sb.toString());
     }
 
-    private void generateMultipleTypesMessage(StringBuilder sb, Object[] type) {
-        if (type.length == 1) {
-            sb.append(type[0]);
+    private void generateMultipleTypesMessage(StringBuilder sb, Object[] types) {
+        if (types.length == 1) {
+            sb.append(types[0]);
         } else {
             sb.append("um dos seguintes tipos: [");
-            for (int i = 0; i < type.length; i++) {
-                sb.append(type[i]);
-                if (i < type.length - 1) {
+            for (int i = 0; i < types.length; i++) {
+                sb.append(types[i]);
+                if (i < types.length - 1) {
                     sb.append(", ");
                 }
             }
@@ -143,7 +193,7 @@ public class Syntatic {
     }
 
     private Runnable[] selectNextActions(String phase, boolean shouldThrowError) {
-        Tag t = tag();
+        Tag t = tag(tok[0]);
         Map<Tag, Runnable[]> map = stateMap.get(phase);
         printDebugMessage(phase, null, map);
         if (map.containsKey(t)) {
@@ -159,21 +209,21 @@ public class Syntatic {
         return null;
     }
 
-    private Type executeOne(String phase) {
+    private void executeOne(String phase) {
         Runnable[] actions = selectNextActions(phase, true);
         if (actions != null) {
             run(actions);
         }
     }
 
-    private Type executeZeroOrOne(String phase) {
+    private void executeZeroOrOne(String phase) {
         Runnable[] actions = selectNextActions(phase, false);
         if (actions != null) {
             run(actions);
         }
     }
 
-    private Type executeMany(String phase) {
+    private void executeMany(String phase) {
         Runnable[] actions;
         do {
             actions = selectNextActions(phase, false);
@@ -185,7 +235,7 @@ public class Syntatic {
 
     private void program() {
         advance();
-        if (tok instanceof EOFToken) {
+        if (tok[0] instanceof EOFToken) {
             return;
         }
         String phase = "program";
@@ -216,15 +266,44 @@ public class Syntatic {
     private void decl() {
         String phase = "decl";
         if (!stateMap.containsKey(phase)) {
-            put(phase, Tag.ID, this::ident_list, () -> eat(Tag.IS), this::type);
+            put(phase, Tag.ID, () -> {
+                ident_list();
+                if (eat(Tag.IS) == SYNTAX_OK) {
+                    Type idTypes = type();
+                    if (idTypes != null && !idTypes.equals(Type.ERROR)) {
+                        for (Identifier i : identListTemp) {
+                            i.setType(idTypes);
+                            SymbolTable.putToken(i);
+                        }
+                    }
+                }
+                identListTemp.clear();
+            });
         }
         executeOne(phase);
+    }
+
+    private void validateDeclaration(Token actual, Integer actualLine, Type t) {
+        if (Type.UNDECLARED_ID.equals(t) && actual instanceof Identifier) {
+            identListTemp.add((Identifier) actual);
+            ((Identifier) actual).setDeclarationLine(actualLine);
+        } else {
+            createSemanticError(SEMANTIC_DECLARED_REPEAT, actual, null, actualLine);
+        }
     }
 
     private void ident_list() {
         String phase = "ident_list";
         if (!stateMap.containsKey(phase)) {
-            put(phase, Tag.ID, () -> eat(Tag.ID), this::ident_list_2);
+            put(phase, Tag.ID, () -> {
+                Integer line = lexer.getLine();
+                Token actual = tok[0];
+                Type t = tokenType(actual);
+                if (eat(Tag.ID) == SYNTAX_OK) {
+                    validateDeclaration(actual, line, t);
+                }
+                ident_list_2();
+            });
         }
         executeOne(phase);
     }
@@ -232,19 +311,34 @@ public class Syntatic {
     private void ident_list_2() {
         String phase = "ident_list_2";
         if (!stateMap.containsKey(phase)) {
-            put(phase, Tag.COMMA, () -> eat(Tag.COMMA), () -> eat(Tag.ID));
+            put(phase, Tag.COMMA, () -> eat(Tag.COMMA), () -> {
+                Integer line = lexer.getLine();
+                Token actual = tok[0];
+                Type t = tokenType(actual);
+                if (eat(Tag.ID) == SYNTAX_OK) {
+                    validateDeclaration(actual, line, t);
+                }
+            });
         }
         executeMany(phase);
     }
 
     private Type type() {
         String phase = "type";
+        type_stack.push(new Type[1]);
         if (!stateMap.containsKey(phase)) {
             for (Tag t : SymbolTable.TYPE_TAG) {
-                put(phase, t, () -> eat(t));
+                put(phase, t, () -> {
+                    Token actual = tok[0];
+                    Type type = tokenType(actual);
+                    if (eat(t) == SYNTAX_OK) {
+                        type_stack.peek()[0] = type;
+                    }
+                });
             }
         }
         executeOne(phase);
+        return type_stack.pop()[0];
     }
 
     private void stmt_list() {
@@ -271,7 +365,22 @@ public class Syntatic {
     private void assign_stmt() {
         String phase = "assign_stmt";
         if (!stateMap.containsKey(phase)) {
-            put(phase, Tag.ID, () -> eat(Tag.ID), () -> eat(Tag.ASSIGN), this::simple_expr);
+            put(phase, Tag.ID, () -> {
+                Integer line = lexer.getLine();
+                Token lhs = tok[0];
+                Type lhsType = tokenType(lhs);
+                int eatLhs = eat(Tag.ID);
+                int eatAssign = eat(Tag.ASSIGN);
+                Type rhsType = simple_expr();
+                if (eatLhs == SYNTAX_OK && eatAssign == SYNTAX_OK && rhsType != null) {
+                    if (lhsType.equals(Type.UNDECLARED_ID)) {
+                        createSemanticError(SEMANTIC_UNDECLARED, lhs, null, line);
+                    } else if (notNullOrErrors(rhsType, lhsType) && !lhsType.equals(rhsType)) {
+                        //Se o lado direito tiver dado problema, não reportar como erro pois a expressão do lado direito já terá reportado
+                        createSemanticError(SEMANTIC_WRONG_TYPE, null, rhsType, line, lhsType);
+                    }
+                }
+            });
         }
         executeOne(phase);
     }
@@ -279,7 +388,20 @@ public class Syntatic {
     private void if_stmt() {
         String phase = "if_stmt";
         if (!stateMap.containsKey(phase)) {
-            put(phase, Tag.IF, () -> eat(Tag.IF), this::expression, () -> eat(Tag.THEN), this::stmt_list, this::if_stmt_cont);
+            put(phase, Tag.IF, () -> {
+                Integer line = lexer.getLine();
+                int ifOk = eat(Tag.IF);
+                Type exprType = expression();
+                int thenOk = eat(Tag.THEN);
+                stmt_list();
+                if_stmt_cont();
+                if (ifOk == SYNTAX_OK && thenOk == SYNTAX_OK && notNullOrErrors(exprType)) {
+                    //Se não houve erro de sintaxe (ou semântico dentro de expression), então validar semântica.
+                    if (!exprType.equals(Type.BOOLEAN)) {
+                        createSemanticError(SEMANTIC_WRONG_TYPE, null, exprType, line, Type.BOOLEAN);
+                    }
+                }
+            });
         }
         executeOne(phase);
     }
@@ -304,7 +426,18 @@ public class Syntatic {
     private void stmt_suffix() {
         String phase = "stmt_suffix";
         if (!stateMap.containsKey(phase)) {
-            put(phase, Tag.WHILE, () -> eat(Tag.WHILE), this::expression);
+            put(phase, Tag.WHILE, () -> {
+                Integer line = lexer.getLine();
+                int whileOk = eat(Tag.WHILE);
+                Type exprType = expression();
+                if (whileOk == SYNTAX_OK && notNullOrErrors(exprType)) {
+                    //Se não houve erro de sintaxe (ou semântico dentro de expression), então validar semântica.
+                    if (!exprType.equals(Type.BOOLEAN)) {
+                        expression_stack.peek()[0] = Type.ERROR;
+                        createSemanticError(SEMANTIC_WRONG_TYPE, null, exprType, line, Type.BOOLEAN);
+                    }
+                }
+            });
         }
         executeOne(phase);
     }
@@ -327,110 +460,271 @@ public class Syntatic {
 
     private Type expression() {
         String phase = "expression";
+        expression_stack.push(new Type[1]);
         if (!stateMap.containsKey(phase)) {
-            putMultiple(phase, new Tag[]{Tag.ID, Tag.NUM, Tag.LITERAL, Tag.OP_PAR, Tag.NOT, Tag.SUBT}, this::simple_expr, this::expression_cont);
+            putMultiple(phase, new Tag[]{Tag.ID, Tag.NUM, Tag.LITERAL, Tag.OP_PAR, Tag.NOT, Tag.SUBT}, () -> {
+                Integer line = lexer.getLine();
+                Type simplExprType = simple_expr();
+                Type contType = expression_cont();
+                if (notNullOrErrors(simplExprType, contType)) {
+                    if (contType.equals(Type.INTEGER)) {
+                        if (simplExprType.equals(Type.INTEGER)) {
+                            expression_stack.peek()[0] = Type.BOOLEAN;
+                        } else {
+                            expression_stack.peek()[0] = Type.ERROR;
+                            createSemanticError(SEMANTIC_WRONG_TYPE, null, simplExprType, line, Type.INTEGER);
+                        }
+                    } else {
+                        expression_stack.peek()[0] = simplExprType;
+                    }
+                }
+            });
         }
         executeOne(phase);
+        return expression_stack.pop()[0];
     }
 
     private Type expression_cont() {
         String phase = "expression_cont";
+        expression_cont_stack.push(new Type[]{Type.VOID});
         if (!stateMap.containsKey(phase)) {
-            putMultiple(phase, SymbolTable.RELOP_TAG, this::relop, this::simple_expr);
+            putMultiple(phase, SymbolTable.RELOP_TAG, () -> {
+                Integer line = lexer.getLine();
+                Type relopType = relop();
+                Type simplExprType = simple_expr();
+                if (notNullOrErrors(relopType, simplExprType)) {
+                    if (simplExprType.equals(Type.INTEGER)) {
+                        expression_cont_stack.peek()[0] = Type.INTEGER;
+                    } else {
+                        expression_cont_stack.peek()[0] = Type.ERROR;
+                        createSemanticError(SEMANTIC_WRONG_TYPE, null, simplExprType, line, Type.INTEGER);
+                    }
+                }
+            });
         }
         executeZeroOrOne(phase);
+        return expression_cont_stack.pop()[0];
     }
 
     //Alterada por causa de recursão à esquerda
     private Type simple_expr() {
         String phase = "simple_expr";
+        simple_expr_stack.push(new Type[1]);
         if (!stateMap.containsKey(phase)) {
-            putMultiple(phase, new Tag[]{Tag.ID, Tag.NUM, Tag.LITERAL, Tag.OP_PAR, Tag.NOT, Tag.SUBT}, this::term, this::simple_expr_linha);
+            putMultiple(phase, new Tag[]{Tag.ID, Tag.NUM, Tag.LITERAL, Tag.OP_PAR, Tag.NOT, Tag.SUBT}, () -> {
+                Integer line = lexer.getLine();
+                Type termType = term();
+                Type simplExprLinha = simple_expr_linha();
+                if (notNullOrErrors(termType, simplExprLinha)) {
+                    if (simplExprLinha.equals(Type.INTEGER) && !termType.equals(Type.INTEGER)) {
+                        simple_expr_stack.peek()[0] = Type.ERROR;
+                        createSemanticError(SEMANTIC_WRONG_TYPE, null, termType, line, Type.INTEGER);
+                    } else {
+                        simple_expr_stack.peek()[0] = termType;
+                    }
+                }
+            });
         }
         executeOne(phase);
+        return simple_expr_stack.pop()[0];
     }
 
-    private void simple_expr_linha() {
+    private Type simple_expr_linha() {
         String phase = "simple_expr_linha";
+        simple_expr_linha_stack.push(new Type[]{Type.VOID});
         if (!stateMap.containsKey(phase)) {
-            putMultiple(phase, SymbolTable.ADDOP_TAG, this::addop, this::term, this::simple_expr_linha);
+            putMultiple(phase, SymbolTable.ADDOP_TAG, () -> {
+                Integer line = lexer.getLine();
+                Type addopType = addop();
+                Type termType = term();
+                Type simpleExprLinha = simple_expr_linha();
+                if (notNullOrErrors(addopType, termType, simpleExprLinha)) {
+                    if (termType.equals(Type.INTEGER)) {
+                        simple_expr_linha_stack.peek()[0] = Type.INTEGER;
+                    } else {
+                        simple_expr_linha_stack.peek()[0] = Type.ERROR;
+                        createSemanticError(SEMANTIC_WRONG_TYPE, null, termType, line, Type.INTEGER);
+                    }
+                } else {
+                    simple_expr_linha_stack.peek()[0] = Type.ERROR;
+                }
+            });
         }
         executeZeroOrOne(phase);
+        return simple_expr_linha_stack.pop()[0];
     }
 
-    private void term() {
+    private Type term() {
         String phase = "term";
+        term_stack.push(new Type[1]);
         if (!stateMap.containsKey(phase)) {
-            putMultiple(phase, new Tag[]{Tag.ID, Tag.NUM, Tag.LITERAL, Tag.OP_PAR, Tag.NOT, Tag.SUBT}, this::factor_a, this::term_linha);
+            putMultiple(phase, new Tag[]{Tag.ID, Tag.NUM, Tag.LITERAL, Tag.OP_PAR, Tag.NOT, Tag.SUBT}, () -> {
+                Integer line = lexer.getLine();
+                Type factorAType = factor_a();
+                Type termLinhaType = term_linha();
+                if (notNullOrErrors(factorAType, termLinhaType)) {
+                    if (termLinhaType.equals(Type.INTEGER) && !factorAType.equals(Type.INTEGER)) {
+                        term_stack.peek()[0] = Type.ERROR;
+                        createSemanticError(SEMANTIC_WRONG_TYPE, null, factorAType, line, Type.INTEGER);
+                    } else {
+                        term_stack.peek()[0] = factorAType;
+                    }
+                }
+            });
         }
         executeOne(phase);
+        return term_stack.pop()[0];
     }
 
-    private void term_linha() {
+    private Type term_linha() {
         String phase = "term_linha";
+        term_linha_stack.push(new Type[]{Type.VOID});
         if (!stateMap.containsKey(phase)) {
-            putMultiple(phase, SymbolTable.MULOP_TAG, this::mulop, this::factor_a, this::term_linha);
+            putMultiple(phase, SymbolTable.MULOP_TAG, () -> {
+                Integer line = lexer.getLine();
+                Type mulopType = mulop();
+                Type factorAType = factor_a();
+                Type termLinhaType = term_linha();
+                if (notNullOrErrors(mulopType, factorAType, termLinhaType)) {
+                    if (factorAType.equals(Type.INTEGER)) {
+                        term_linha_stack.peek()[0] = Type.INTEGER;
+                    } else {
+                        term_linha_stack.peek()[0] = Type.ERROR;
+                        createSemanticError(SEMANTIC_WRONG_TYPE, null, factorAType, line, Type.INTEGER);
+                    }
+                } else {
+                    term_linha_stack.peek()[0] = Type.ERROR;
+                }
+            });
         }
         executeZeroOrOne(phase);
+        return term_linha_stack.pop()[0];
     }
 
-    private void factor_a() {
+    private Type factor_a() {
         String phase = "factor_a";
+        factor_a_stack.push(new Type[1]);
         if (!stateMap.containsKey(phase)) {
-            putMultiple(phase, new Tag[]{Tag.ID, Tag.NUM, Tag.LITERAL, Tag.OP_PAR}, this::factor);
-            put(phase, Tag.NOT, () -> eat(Tag.NOT), this::factor);
-            put(phase, Tag.SUBT, () -> eat(Tag.SUBT), this::factor);
+            putMultiple(phase, new Tag[]{Tag.ID, Tag.NUM, Tag.LITERAL, Tag.OP_PAR}, () -> factor_a_aux(null));
+            put(phase, Tag.NOT, () -> factor_a_aux(Tag.NOT));
+            put(phase, Tag.SUBT, () -> factor_a_aux(Tag.SUBT));
         }
         executeOne(phase);
+        return factor_a_stack.pop()[0];
     }
 
-    private void factor() {
+    private void factor_a_aux(Tag t) {
+        int eatOk = t == null ? SYNTAX_OK : eat(t);
+        Type factorType = factor();
+        if (eatOk == SYNTAX_OK && notNullOrErrors(factorType)) {
+            factor_a_stack.peek()[0] = factorType;
+        }
+    }
+
+    private Type factor() {
         String phase = "factor";
+        factor_stack.push(new Type[1]);
         if (!stateMap.containsKey(phase)) {
-            put(phase, Tag.ID, () -> eat(Tag.ID));
-            putMultiple(phase, new Tag[]{Tag.NUM, Tag.LITERAL}, this::constant);
-            put(phase, Tag.OP_PAR, () -> eat(Tag.OP_PAR), this::expression, () -> eat(Tag.CL_PAR));
+            put(phase, Tag.ID, () -> {
+                Integer line = lexer.getLine();
+                Token actual = tok[0];
+                Type t = tokenType(actual);
+                int eatOk = eat(Tag.ID);
+                if (eatOk == SYNTAX_OK) {
+                    if (t.equals(Type.UNDECLARED_ID)) {
+                        factor_stack.peek()[0] = Type.ERROR;
+                        createSemanticError(SEMANTIC_UNDECLARED, actual, null, line);
+                    } else {
+                        factor_stack.peek()[0] = t;
+                    }
+                }
+            });
+            putMultiple(phase, new Tag[]{Tag.NUM, Tag.LITERAL}, () -> {
+                Type constantType = constant();
+                if (notNullOrErrors(constantType)) {
+                    factor_stack.peek()[0] = constantType;
+                }
+            });
+            put(phase, Tag.OP_PAR, () -> {
+                int eatOpParOk = eat(Tag.OP_PAR);
+                Type exprType = expression();
+                int eatClParOk = eat(Tag.CL_PAR);
+                if (eatOpParOk == SYNTAX_OK && eatClParOk == SYNTAX_OK && notNullOrErrors(exprType)) {
+                    factor_stack.peek()[0] = exprType;
+                }
+            });
         }
         executeOne(phase);
+        return factor_stack.pop()[0];
     }
 
-    private void relop() {
+    private Type relop() {
         String phase = "relop";
+        relop_stack.push(new Type[1]);
         if (!stateMap.containsKey(phase)) {
             for (Tag t : SymbolTable.RELOP_TAG) {
-                put(phase, t, () -> eat(t));
+                put(phase, t, () -> {
+                    int eatOk = eat(t);
+                    if (eatOk == SYNTAX_OK) {
+                        relop_stack.peek()[0] = Type.VOID;
+                    }
+                });
             }
         }
         executeOne(phase);
+        return relop_stack.pop()[0];
     }
 
-    private void addop() {
+    private Type addop() {
         String phase = "addop";
+        addop_stack.push(new Type[1]);
         if (!stateMap.containsKey(phase)) {
             for (Tag t : SymbolTable.ADDOP_TAG) {
-                put(phase, t, () -> eat(t));
+                put(phase, t, () -> {
+                    int eatOk = eat(t);
+                    if (eatOk == SYNTAX_OK) {
+                        addop_stack.peek()[0] = Type.VOID;
+                    }
+                });
             }
         }
         executeOne(phase);
+        return addop_stack.pop()[0];
     }
 
-    private void mulop() {
+    private Type mulop() {
         String phase = "mulop";
+        mulop_stack.push(new Type[1]);
         if (!stateMap.containsKey(phase)) {
             for (Tag t : SymbolTable.MULOP_TAG) {
-                put(phase, t, () -> eat(t));
+                put(phase, t, () -> {
+                    int eatOk = eat(t);
+                    if (eatOk == SYNTAX_OK) {
+                        mulop_stack.peek()[0] = Type.VOID;
+                    }
+                });
             }
         }
         executeOne(phase);
+        return mulop_stack.pop()[0];
     }
 
-    private void constant() {
+    private Type constant() {
         String phase = "constant";
+        constant_stack.push(new Type[1]);
         if (!stateMap.containsKey(phase)) {
-            put(phase, Tag.NUM, () -> eat(Tag.NUM));
-            put(phase, Tag.LITERAL, () -> eat(Tag.LITERAL));
+            put(phase, Tag.NUM, () -> constant_aux(Tag.NUM));
+            put(phase, Tag.LITERAL, () -> constant_aux(Tag.LITERAL));
         }
         executeOne(phase);
+        return constant_stack.pop()[0];
+    }
+
+    private void constant_aux(Tag t) {
+        int eatOk = eat(t);
+        if (eatOk == SYNTAX_OK) {
+            constant_stack.peek()[0] = t.equals(Tag.NUM) ? Type.INTEGER : Type.STRING;
+        }
     }
 
     private void printDebugMessage(String phase, Tag t, Map<Tag, Runnable[]> map) {
@@ -450,12 +744,20 @@ public class Syntatic {
                 }
             }
             sb.append("]");
-            System.out.println("DEBUG: fase " + phase + ", Tags esperadas: " + sb.toString() + ", Token/Sequencia atual: " + tokenValue() + ", Tag atual: " + tag());
+            System.out.println("DEBUG: fase " + phase + ", Tags esperadas: " + sb.toString() + ", Token/Sequencia atual: " + tokenValue(tok[0]) + ", Tag atual: " + tag(tok[0]));
         }
     }
 
     public void analyze() {
         program();
+    }
+
+    private boolean notNullOrErrors(Type... types) {
+        boolean retVal = true;
+        for (int i = 0; i < types.length && retVal; i++) {
+            retVal = types[i] != null && !Type.ERROR.equals(types[i]);
+        }
+        return retVal;
     }
 
 }
