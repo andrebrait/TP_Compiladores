@@ -14,7 +14,7 @@ public enum Type {
     STRING(Tag.STRING, 1),
     VOID(null, null),
     ERROR(null, null),
-    SYNTAX_ERROR(null, null);
+    BOOLEAN(null, 1);
 
     private Tag tag;
     private Integer length;

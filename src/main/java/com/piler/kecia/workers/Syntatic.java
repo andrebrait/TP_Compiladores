@@ -74,13 +74,15 @@ public class Syntatic {
         tok = lexer.scan();
     }
 
-    private void eat(Tag t) {
+    private Type eat(Tag t) {
         printDebugMessage("eat", t, null);
         if (!t.equals(tag())) {
             createSyntaxError(t);
         }
         advance();
     }
+
+    //FIXME As regiões com semântica tem que ser colocadas em um único runnable gigante em vez de ficar em lista
 
     private void createSyntaxError(Tag... tags) {
         StringBuilder sb = new StringBuilder();
@@ -157,21 +159,21 @@ public class Syntatic {
         return null;
     }
 
-    private void executeOne(String phase) {
+    private Type executeOne(String phase) {
         Runnable[] actions = selectNextActions(phase, true);
         if (actions != null) {
             run(actions);
         }
     }
 
-    private void executeZeroOrOne(String phase) {
+    private Type executeZeroOrOne(String phase) {
         Runnable[] actions = selectNextActions(phase, false);
         if (actions != null) {
             run(actions);
         }
     }
 
-    private void executeMany(String phase) {
+    private Type executeMany(String phase) {
         Runnable[] actions;
         do {
             actions = selectNextActions(phase, false);
@@ -235,7 +237,7 @@ public class Syntatic {
         executeMany(phase);
     }
 
-    private void type() {
+    private Type type() {
         String phase = "type";
         if (!stateMap.containsKey(phase)) {
             for (Tag t : SymbolTable.TYPE_TAG) {
@@ -323,7 +325,7 @@ public class Syntatic {
         executeOne(phase);
     }
 
-    private void expression() {
+    private Type expression() {
         String phase = "expression";
         if (!stateMap.containsKey(phase)) {
             putMultiple(phase, new Tag[]{Tag.ID, Tag.NUM, Tag.LITERAL, Tag.OP_PAR, Tag.NOT, Tag.SUBT}, this::simple_expr, this::expression_cont);
@@ -331,7 +333,7 @@ public class Syntatic {
         executeOne(phase);
     }
 
-    private void expression_cont() {
+    private Type expression_cont() {
         String phase = "expression_cont";
         if (!stateMap.containsKey(phase)) {
             putMultiple(phase, SymbolTable.RELOP_TAG, this::relop, this::simple_expr);
@@ -340,7 +342,7 @@ public class Syntatic {
     }
 
     //Alterada por causa de recursão à esquerda
-    private void simple_expr() {
+    private Type simple_expr() {
         String phase = "simple_expr";
         if (!stateMap.containsKey(phase)) {
             putMultiple(phase, new Tag[]{Tag.ID, Tag.NUM, Tag.LITERAL, Tag.OP_PAR, Tag.NOT, Tag.SUBT}, this::term, this::simple_expr_linha);
